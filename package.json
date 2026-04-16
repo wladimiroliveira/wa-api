@@ -1,0 +1,25 @@
+{
+  "name": "wa-api",
+  "type": "module",
+  "scripts": {
+    "lint:prettier:check": "prettier --check .",
+    "lint:prettier:fix": "prettier --write .",
+    "prepare": "husky",
+    "commit": "cz"
+  },
+  "dependencies": {
+    "fastify": "5.8.5"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "commitizen": "^4.3.1",
+    "husky": "^9.1.7",
+    "prettier": "3.8.3"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  }
+}
