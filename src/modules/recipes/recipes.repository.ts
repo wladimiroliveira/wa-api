@@ -1,6 +1,6 @@
 import prisma from "../../lib/prisma.js";
 import { Prisma } from "../../generated/prisma/index.js";
-import type { CreateRecipeInput } from "./recipes.schema.js";
+import type { CreateRecipeInput, UpdateRecipeInput } from "./recipes.schema.js";
 
 export function listRecipes() {
   return prisma.recipe.findMany({ orderBy: { name: "asc" } });
@@ -30,6 +30,35 @@ export function createRecipe(data: CreateRecipeInput) {
       },
     },
     include: { items: true },
+  });
+}
+
+export function updateRecipe(id: string, data: UpdateRecipeInput) {
+  return prisma.$transaction(async (tx) => {
+    if (data.items) {
+      await tx.recipeItem.deleteMany({ where: { recipeId: id } });
+    }
+    return tx.recipe.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.batchYield !== undefined && { batchYield: new Prisma.Decimal(data.batchYield) }),
+        ...(data.laborCostPerHundred !== undefined && {
+          laborCostPerHundred: new Prisma.Decimal(data.laborCostPerHundred),
+        }),
+        ...(data.margin !== undefined && { margin: new Prisma.Decimal(data.margin) }),
+        ...(data.items && {
+          items: {
+            create: data.items.map((item) => ({
+              supplyId: item.supplyId,
+              usageQty: new Prisma.Decimal(item.usageQty),
+              usageUnit: item.usageUnit,
+            })),
+          },
+        }),
+      },
+      include: { items: true },
+    });
   });
 }
 
