@@ -27,6 +27,7 @@
 - Create: `src/lib/prisma.ts`
 - Create: `vitest.config.ts`
 - Create: `src/lib/prisma.smoke.test.ts`
+- Create: `docker-compose.yml` (PostgreSQL 17 alpine)
 - Modify: `package.json` (deps + scripts)
 - Modify: `.example.env` (DATABASE_URL)
 - Create: `.env` (local, não versionado — já ignorado pelo `.gitignore`)
@@ -126,7 +127,33 @@ model RecipeItem {
 }
 ```
 
-- [ ] **Step 5: Configurar `DATABASE_URL`**
+- [ ] **Step 5: Criar `docker-compose.yml` (PostgreSQL 17 alpine)**
+
+```yaml
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: wa-api-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: wa_api
+    ports:
+      - "5432:5432"
+    volumes:
+      - wa-api-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wa_api"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  wa-api-pgdata:
+```
+
+- [ ] **Step 6: Configurar `DATABASE_URL`**
 
 Adicionar em `.example.env`:
 
@@ -134,14 +161,19 @@ Adicionar em `.example.env`:
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/wa_api?schema=public"
 ```
 
-Criar `.env` local com a URL do Postgres real da máquina (o `.gitignore` já ignora `.env`). É necessário um PostgreSQL rodando para migrar.
+Criar `.env` local com a mesma URL (o `.gitignore` já ignora `.env`).
 
-- [ ] **Step 6: Rodar a migração inicial e gerar o client**
+- [ ] **Step 7: Subir o PostgreSQL**
+
+Run: `docker compose up -d --wait`
+Expected: container `wa-api-postgres` saudável (healthcheck ok); porta 5432 acessível.
+
+- [ ] **Step 8: Rodar a migração inicial e gerar o client**
 
 Run: `npm run db:migrate -- --name init`
 Expected: cria `prisma/migrations/*_init/`, aplica no banco e gera o client em `src/generated/prisma`.
 
-- [ ] **Step 7: Criar o singleton do Prisma `src/lib/prisma.ts`**
+- [ ] **Step 9: Criar o singleton do Prisma `src/lib/prisma.ts`**
 
 ```ts
 import { PrismaClient } from "../generated/prisma/index.js";
@@ -151,7 +183,7 @@ const prisma = new PrismaClient();
 export default prisma;
 ```
 
-- [ ] **Step 8: Escrever smoke test `src/lib/prisma.smoke.test.ts`**
+- [ ] **Step 10: Escrever smoke test `src/lib/prisma.smoke.test.ts`**
 
 ```ts
 import { expect, test } from "vitest";
@@ -163,19 +195,19 @@ test("Prisma.Decimal faz aritmética exata", () => {
 });
 ```
 
-- [ ] **Step 9: Rodar o teste**
+- [ ] **Step 11: Rodar o teste**
 
 Run: `npm test`
 Expected: PASS (confirma que o client foi gerado e o Vitest roda TS/ESM).
 
-- [ ] **Step 10: Ignorar o client gerado no git**
+- [ ] **Step 12: Ignorar o client gerado no git**
 
 Adicionar `src/generated/` ao `.gitignore`.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
-git add package.json package-lock.json vitest.config.ts prisma/schema.prisma prisma/migrations .example.env .gitignore src/lib/prisma.ts src/lib/prisma.smoke.test.ts
+git add docker-compose.yml package.json package-lock.json vitest.config.ts prisma/schema.prisma prisma/migrations .example.env .gitignore src/lib/prisma.ts src/lib/prisma.smoke.test.ts
 git commit -m "chore: configura prisma, postgresql e vitest"
 ```
 
@@ -1027,5 +1059,5 @@ Expected: `400` (insumo em `UN`/COUNT não aceita consumo em `ML`/VOLUME).
 
 ## Notas de execução
 
-- **Pré-requisito:** um PostgreSQL acessível via `DATABASE_URL`. Sem ele, a Task 1 (migração) e a Task 7 (smoke) não rodam; as Tasks 2–6 (funções puras) rodam sem banco, pois os testes usam apenas `Prisma.Decimal`/enums do client gerado.
-- **Ordem obrigatória:** Task 1 gera o client Prisma; todas as demais importam dele. Não pular.
+- **PostgreSQL:** provido pelo `docker-compose.yml` (Postgres 17 alpine) criado na Task 1; sobe com `docker compose up -d --wait`. As Tasks 2–6 (funções puras) não dependem do banco em runtime, mas importam tipos/enums do client gerado na Task 1.
+- **Ordem obrigatória:** Task 1 sobe o banco, migra e gera o client Prisma; todas as demais importam dele. Não pular.
