@@ -13,7 +13,7 @@ app.setSerializerCompiler(serializerCompiler);
 
 await app.register(fastifyCors, {
   origin: ["*"],
-  methods: ["GET", "POST", "PATCH"],
+  methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 });
 
