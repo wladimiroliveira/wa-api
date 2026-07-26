@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { Prisma, UnitOfMeasure } from "../../generated/prisma/index.js";
 import { calculatePricing } from "./pricing.calc.js";
+import { DimensionMismatchError } from "../recipes/recipes.validation.js";
 
 describe("calculatePricing (cento de brigadeiro)", () => {
   // Lote de 100 un que consome R$45 em insumos (1 insumo: R$45 por 1 UN, usa 1 UN).
@@ -37,9 +38,65 @@ describe("calculatePricing (cento de brigadeiro)", () => {
     expect(calculatePricing(recipe).pricePerHalfHundred.equals("52")).toBe(true);
   });
 
-  test("arredondamento pra cima: custo 40 margem 0,6 → exato 64 fica 64; 40,10 vira 65", () => {
+  test("arredondamento pra cima: labor 0,10 sobre custo de insumos 45 → 45,10 × 1,6 = 72,16 → 73", () => {
     const r2 = { ...recipe, laborCostPerHundred: new Prisma.Decimal("0.10"), items: recipe.items };
     // suppliesPerHundred 45 + 0,10 = 45,10; ×1,6 = 72,16 → arredonda 73
     expect(calculatePricing(r2).pricePerHundred.equals("73")).toBe(true);
+  });
+});
+
+describe("calculatePricing (múltiplos itens)", () => {
+  // 2 insumos: R$10/1KG usando 500G (= R$5) + R$8/1UN usando 2UN (= R$16). Total por lote = R$21.
+  const recipe = {
+    batchYield: new Prisma.Decimal(100),
+    laborCostPerHundred: new Prisma.Decimal("0.00"),
+    margin: new Prisma.Decimal("0.00"),
+    items: [
+      {
+        usageQty: new Prisma.Decimal(500),
+        usageUnit: UnitOfMeasure.G,
+        supply: {
+          purchasePrice: new Prisma.Decimal("10.00"),
+          purchaseQty: new Prisma.Decimal(1),
+          purchaseUnit: UnitOfMeasure.KG,
+        },
+      },
+      {
+        usageQty: new Prisma.Decimal(2),
+        usageUnit: UnitOfMeasure.UN,
+        supply: {
+          purchasePrice: new Prisma.Decimal("8.00"),
+          purchaseQty: new Prisma.Decimal(1),
+          purchaseUnit: UnitOfMeasure.UN,
+        },
+      },
+    ],
+  };
+
+  test("soma corretamente os custos de 2 itens (R$5 + R$16 = R$21 por cento)", () => {
+    expect(calculatePricing(recipe).totalCostPerHundred.equals("21")).toBe(true);
+  });
+});
+
+describe("calculatePricing (guarda de dimensão)", () => {
+  test("lança DimensionMismatchError quando item usa dimensão incompatível com o supply", () => {
+    const recipe = {
+      batchYield: new Prisma.Decimal(100),
+      laborCostPerHundred: new Prisma.Decimal("20.00"),
+      margin: new Prisma.Decimal("0.60"),
+      items: [
+        {
+          usageQty: new Prisma.Decimal(1),
+          usageUnit: UnitOfMeasure.ML,
+          supply: {
+            purchasePrice: new Prisma.Decimal("45.00"),
+            purchaseQty: new Prisma.Decimal(1),
+            purchaseUnit: UnitOfMeasure.UN,
+          },
+        },
+      ],
+    };
+
+    expect(() => calculatePricing(recipe)).toThrow(DimensionMismatchError);
   });
 });
