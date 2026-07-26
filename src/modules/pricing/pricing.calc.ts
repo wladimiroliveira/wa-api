@@ -2,6 +2,7 @@ import { Prisma, UnitOfMeasure } from "../../generated/prisma/index.js";
 import { toBase } from "../shared/unit-of-measure.js";
 import { costPerBase, type SupplyCostInput } from "../supplies/supplies.cost.js";
 import { ONE_REAL, roundUpToNearest } from "../shared/money.js";
+import { assertItemDimension } from "../recipes/recipes.validation.js";
 
 export interface RecipeItemForPricing {
   usageQty: Prisma.Decimal;
@@ -25,10 +26,10 @@ export interface PricingResult {
 }
 
 export function calculatePricing(recipe: RecipeForPricing): PricingResult {
-  const suppliesCostPerBatch = recipe.items.reduce(
-    (acc, item) => acc.add(toBase(item.usageQty, item.usageUnit).mul(costPerBase(item.supply))),
-    new Prisma.Decimal(0),
-  );
+  const suppliesCostPerBatch = recipe.items.reduce((acc, item) => {
+    assertItemDimension(item.supply.purchaseUnit, item.usageUnit);
+    return acc.add(toBase(item.usageQty, item.usageUnit).mul(costPerBase(item.supply)));
+  }, new Prisma.Decimal(0));
 
   const hundreds = recipe.batchYield.div(100);
   const suppliesCostPerHundred = suppliesCostPerBatch.div(hundreds);
