@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { Prisma, UnitOfMeasure } from "../../generated/prisma/index.js";
-import { costPerBase } from "./supplies.cost.js";
+import { Prisma, UnitOfMeasure } from "../../../src/generated/prisma/index.js";
+import { costPerBase } from "../../../src/modules/supplies/supplies.cost.js";
 
 describe("costPerBase", () => {
   test("chocolate: R$12,00 por 1 KG → R$0,012 por grama", () => {

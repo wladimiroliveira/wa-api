@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { buildApp } from "../../server.js";
-import prisma from "../../lib/prisma.js";
+import { buildApp } from "../../../src/server.js";
+import prisma from "../../../src/lib/prisma.js";
 
 describe("pricing routes (integração)", () => {
   let app: FastifyInstance;

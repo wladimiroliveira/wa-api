@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { Prisma } from "../../generated/prisma/index.js";
-import { ONE_REAL, roundUpToNearest } from "./money.js";
+import { Prisma } from "../../../src/generated/prisma/index.js";
+import { ONE_REAL, roundUpToNearest } from "../../../src/modules/shared/money.js";
 
 describe("money.roundUpToNearest", () => {
   test("arredonda 103,73 para cima → 104", () => {

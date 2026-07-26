@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { Prisma, UnitOfMeasure } from "../../generated/prisma/index.js";
-import { calculatePricing } from "./pricing.calc.js";
-import { DimensionMismatchError } from "../recipes/recipes.validation.js";
+import { Prisma, UnitOfMeasure } from "../../../src/generated/prisma/index.js";
+import { calculatePricing } from "../../../src/modules/pricing/pricing.calc.js";
+import { DimensionMismatchError } from "../../../src/modules/recipes/recipes.validation.js";
 
 describe("calculatePricing (cento de brigadeiro)", () => {
   // Lote de 100 un que consome R$45 em insumos (1 insumo: R$45 por 1 UN, usa 1 UN).

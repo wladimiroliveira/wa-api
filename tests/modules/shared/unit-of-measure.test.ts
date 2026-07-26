@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { Prisma, UnitOfMeasure } from "../../generated/prisma/index.js";
-import { dimensionOf, sameDimension, toBase } from "./unit-of-measure.js";
+import { Prisma, UnitOfMeasure } from "../../../src/generated/prisma/index.js";
+import { dimensionOf, sameDimension, toBase } from "../../../src/modules/shared/unit-of-measure.js";
 
 describe("unit-of-measure", () => {
   test("KG pertence à dimensão WEIGHT", () => {
