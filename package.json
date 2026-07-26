@@ -3,15 +3,20 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node ./dist/server.js",
     "lint:prettier:check": "prettier --check .",
     "lint:prettier:fix": "prettier --write .",
     "prepare": "husky",
-    "commit": "cz"
+    "commit": "cz",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate"
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",
+    "@prisma/client": "6.19.3",
     "dotenv": "17.4.2",
     "fastify": "5.8.5",
     "fastify-type-provider-zod": "6.1.0",
@@ -25,7 +30,9 @@
     "commitizen": "4.3.1",
     "husky": "9.1.7",
     "prettier": "3.8.3",
-    "tsx": "4.21.0"
+    "prisma": "6.19.3",
+    "tsx": "4.21.0",
+    "vitest": "4.1.10"
   },
   "config": {
     "commitizen": {
