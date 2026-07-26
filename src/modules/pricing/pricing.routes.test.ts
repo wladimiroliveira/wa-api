@@ -42,8 +42,14 @@ describe("pricing routes (integração)", () => {
   });
 
   afterAll(async () => {
-    if (recipeId) await prisma.recipe.delete({ where: { id: recipeId } }).catch(() => {});
-    if (supplyId) await prisma.supply.delete({ where: { id: supplyId } }).catch(() => {});
+    if (recipeId)
+      await prisma.recipe
+        .delete({ where: { id: recipeId } })
+        .catch((e) => console.warn("cleanup failed (recipe):", e));
+    if (supplyId)
+      await prisma.supply
+        .delete({ where: { id: supplyId } })
+        .catch((e) => console.warn("cleanup failed (supply):", e));
     await app.close();
   });
 
@@ -90,5 +96,53 @@ describe("pricing routes (integração)", () => {
     });
 
     expect(res.statusCode).toBe(400);
+  });
+
+  test("PATCH /recipes/:id/margin com id inexistente retorna 404 (P2025 mapeado pelo error handler global)", async () => {
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/recipes/00000000-0000-0000-0000-000000000000/margin",
+      payload: { margin: 0.5 },
+    });
+
+    expect(res.statusCode).toBe(404);
+  });
+
+  test("DELETE /supplies/:id referenciado por um item de recipe retorna 409 (P2003 mapeado pelo error handler global)", async () => {
+    // Supply e recipe dedicados: a exclusão é bloqueada pela FK Restrict e não pode
+    // deixar o supply/recipe usados nos outros testes em estado inconsistente.
+    const supplyRes = await app.inject({
+      method: "POST",
+      url: "/supplies",
+      payload: {
+        name: "Chocolate em pó (referenciado)",
+        type: "INGREDIENT",
+        purchaseUnit: "UN",
+        purchaseQty: 1,
+        purchasePrice: 10.0,
+      },
+    });
+    expect(supplyRes.statusCode).toBe(201);
+    const referencedSupplyId = supplyRes.json().id;
+
+    const recipeRes = await app.inject({
+      method: "POST",
+      url: "/recipes",
+      payload: {
+        name: "Receita com insumo referenciado",
+        batchYield: 100,
+        laborCostPerHundred: 5.0,
+        margin: 0.5,
+        items: [{ supplyId: referencedSupplyId, usageQty: 1, usageUnit: "UN" }],
+      },
+    });
+    expect(recipeRes.statusCode).toBe(201);
+    const referencedRecipeId = recipeRes.json().id;
+
+    const deleteRes = await app.inject({ method: "DELETE", url: `/supplies/${referencedSupplyId}` });
+    expect(deleteRes.statusCode).toBe(409);
+
+    await prisma.recipe.delete({ where: { id: referencedRecipeId } });
+    await prisma.supply.delete({ where: { id: referencedSupplyId } });
   });
 });
