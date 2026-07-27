@@ -19,7 +19,7 @@ export default async function supplyRoutes(app: FastifyInstance) {
 
   r.get("/supplies/:id", { schema: { params: supplyIdParamSchema } }, async (req, reply) => {
     const supply = await repo.getSupply(req.params.id);
-    if (!supply) return reply.status(404).send({ message: "Supply not found" });
+    if (!supply) return reply.status(404).send({ message: "Insumo não encontrado" });
     return supply;
   });
 

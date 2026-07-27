@@ -10,6 +10,10 @@ export function getSupply(id: string) {
   return prisma.supply.findUnique({ where: { id } });
 }
 
+export function getSuppliesByIds(ids: string[]) {
+  return prisma.supply.findMany({ where: { id: { in: ids } } });
+}
+
 export function createSupply(data: CreateSupplyInput) {
   return prisma.supply.create({
     data: {

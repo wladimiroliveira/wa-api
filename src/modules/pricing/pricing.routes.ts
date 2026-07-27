@@ -10,7 +10,7 @@ export default async function pricingRoutes(app: FastifyInstance) {
 
   r.get("/recipes/:id/pricing", { schema: { params: recipeIdParamSchema } }, async (req, reply) => {
     const recipe = await getRecipeWithItems(req.params.id);
-    if (!recipe) return reply.status(404).send({ message: "Recipe not found" });
+    if (!recipe) return reply.status(404).send({ message: "Receita não encontrada" });
 
     let result;
     try {
@@ -26,7 +26,7 @@ export default async function pricingRoutes(app: FastifyInstance) {
     return {
       suppliesCostPerHundred: result.suppliesCostPerHundred.toFixed(2),
       totalCostPerHundred: result.totalCostPerHundred.toFixed(2),
-      exactPrice: result.exactPrice.toFixed(2),
+      exactPrice: result.exactPrice.toString(),
       pricePerHundred: result.pricePerHundred.toFixed(2),
       pricePerHalfHundred: result.pricePerHalfHundred.toFixed(2),
     };
