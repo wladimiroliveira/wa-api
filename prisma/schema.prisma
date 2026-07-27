@@ -21,16 +21,31 @@ enum UnitOfMeasure {
   UN
 }
 
+enum StockMovementType {
+  ENTRY
+  PRODUCTION
+  WASTE
+}
+
+enum WasteReason {
+  SPOILED
+  DROPPED
+  EXPIRED
+  OTHER
+}
+
 model Supply {
-  id            String        @id @default(uuid())
+  id            String          @id @default(uuid())
   name          String
   type          SupplyType
   purchaseUnit  UnitOfMeasure
   purchaseQty   Decimal
   purchasePrice Decimal
+  currentStock  Decimal         @default(0)
   recipeItems   RecipeItem[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  movements     StockMovement[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 }
 
 model Recipe {
@@ -40,6 +55,7 @@ model Recipe {
   laborCostPerHundred Decimal
   margin              Decimal
   items               RecipeItem[]
+  productions         Production[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 }
@@ -52,4 +68,28 @@ model RecipeItem {
   supply    Supply        @relation(fields: [supplyId], references: [id], onDelete: Restrict)
   usageQty  Decimal
   usageUnit UnitOfMeasure
+}
+
+model StockMovement {
+  id           String            @id @default(uuid())
+  supplyId     String
+  supply       Supply            @relation(fields: [supplyId], references: [id], onDelete: Restrict)
+  type         StockMovementType
+  quantityBase Decimal
+  reason       WasteReason?
+  note         String?
+  productionId String?
+  production   Production?       @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime          @default(now())
+}
+
+model Production {
+  id            String          @id @default(uuid())
+  recipeId      String
+  recipe        Recipe          @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  factor        Decimal
+  producedUnits Decimal
+  note          String?
+  movements     StockMovement[]
+  createdAt     DateTime        @default(now())
 }
