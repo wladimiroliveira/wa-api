@@ -2,7 +2,7 @@ import { Prisma, UnitOfMeasure } from "../../generated/prisma/index.js";
 import { toBase } from "../shared/unit-of-measure.js";
 import { costPerBase, type SupplyCostInput } from "../supplies/supplies.cost.js";
 import { ONE_REAL, roundUpToNearest } from "../shared/money.js";
-import { assertItemDimension } from "../recipes/recipes.validation.js";
+import { assertItemDimension } from "../shared/dimension.js";
 
 export interface RecipeItemForPricing {
   usageQty: Prisma.Decimal;

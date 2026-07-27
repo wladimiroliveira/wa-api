@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { UnitOfMeasure } from "../../../src/generated/prisma/index.js";
-import { assertItemDimension, DimensionMismatchError } from "../../../src/modules/recipes/recipes.validation.js";
+import { assertItemDimension, DimensionMismatchError } from "../../../src/modules/shared/dimension.js";
 
 describe("assertItemDimension", () => {
   test("mesma dimensão (KG comprado, G usado) não lança", () => {

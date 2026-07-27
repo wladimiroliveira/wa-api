@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { recipeIdParamSchema } from "../recipes/recipes.schema.js";
 import { getRecipeWithItems } from "../recipes/recipes.repository.js";
-import { DimensionMismatchError } from "../recipes/recipes.validation.js";
+import { DimensionMismatchError } from "../shared/dimension.js";
 import { calculatePricing } from "./pricing.calc.js";
 
 export default async function pricingRoutes(app: FastifyInstance) {
