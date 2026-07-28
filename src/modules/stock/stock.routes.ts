@@ -4,6 +4,7 @@ import { createStockEntrySchema, supplyIdParamSchema } from "./stock.schema.js";
 import { createStockEntry, SupplyNotFoundError } from "./stock.service.js";
 import { DimensionMismatchError } from "../shared/dimension.js";
 import { listMovements } from "./stock.repository.js";
+import { getSupply } from "../supplies/supplies.repository.js";
 
 export default async function stockRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -26,6 +27,10 @@ export default async function stockRoutes(app: FastifyInstance) {
   r.get(
     "/supplies/:id/movements",
     { schema: { params: supplyIdParamSchema } },
-    async (req) => listMovements(req.params.id),
+    async (req, reply) => {
+      const supply = await getSupply(req.params.id);
+      if (!supply) return reply.status(404).send({ message: "Insumo não encontrado" });
+      return listMovements(req.params.id);
+    },
   );
 }
