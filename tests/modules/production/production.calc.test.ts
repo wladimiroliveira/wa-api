@@ -26,4 +26,17 @@ describe("computeConsumption", () => {
     expect(r.producedUnits.equals(300)).toBe(true);
     expect(r.consumptions.find((c) => c.supplyId === "B")!.consumedBase.equals(600)).toBe(true); // 200 G × 3
   });
+
+  test("aplica toBase na conversão de KG, não um atalho: 0.5 KG × fator 2 → 1000 (base g)", () => {
+    const recipeWithKg = {
+      batchYield: new Prisma.Decimal(100),
+      items: [
+        ...recipe.items,
+        { supplyId: "C", usageQty: new Prisma.Decimal("0.5"), usageUnit: UnitOfMeasure.KG },
+      ],
+    };
+    const r = computeConsumption(recipeWithKg, { batches: new Prisma.Decimal(2) });
+    // toBase(0.5, KG) = 500 g; × fator 2 = 1000.
+    expect(r.consumptions.find((c) => c.supplyId === "C")!.consumedBase.equals(1000)).toBe(true);
+  });
 });

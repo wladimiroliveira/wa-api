@@ -32,7 +32,7 @@ describe("production routes (integração)", () => {
   afterAll(async () => {
     await prisma.stockMovement.deleteMany({ where: { supplyId } }).catch((e) => console.warn("cleanup movements:", e));
     await prisma.production.deleteMany({ where: { recipeId } }).catch((e) => console.warn("cleanup productions:", e));
-    await prisma.recipeItem.deleteMany({ where: { recipeId } }).catch(() => {});
+    await prisma.recipeItem.deleteMany({ where: { recipeId } }).catch((e) => console.warn("cleanup recipeItems:", e));
     await prisma.recipe.delete({ where: { id: recipeId } }).catch((e) => console.warn("cleanup recipe:", e));
     await prisma.supply.delete({ where: { id: supplyId } }).catch((e) => console.warn("cleanup supply:", e));
     await app.close();
@@ -66,6 +66,44 @@ describe("production routes (integração)", () => {
     const warning = res.json().warnings.find((w: { supplyId: string }) => w.supplyId === supplyId);
     expect(warning).toBeDefined();
     expect(warning.resultingStock).toBe("-3");
+  });
+
+  test("GET /productions retorna lista contendo a produção criada", async () => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/productions",
+      payload: { recipeId, producedQty: 100 },
+    });
+    const createdId = created.json().production.id;
+
+    const res = await app.inject({ method: "GET", url: "/productions" });
+    expect(res.statusCode).toBe(200);
+    const list = res.json();
+    expect(Array.isArray(list)).toBe(true);
+    expect(list.some((p: { id: string }) => p.id === createdId)).toBe(true);
+  });
+
+  test("GET /productions/:id retorna a produção com movements e producedUnits", async () => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/productions",
+      payload: { recipeId, producedQty: 100 },
+    });
+    const createdId = created.json().production.id;
+
+    const res = await app.inject({ method: "GET", url: `/productions/${createdId}` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(Array.isArray(body.movements)).toBe(true);
+    expect(body.producedUnits).toBe("100");
+  });
+
+  test("GET /productions/:id inexistente → 404", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/productions/00000000-0000-0000-0000-000000000000",
+    });
+    expect(res.statusCode).toBe(404);
   });
 
   test("receita inexistente → 404", async () => {

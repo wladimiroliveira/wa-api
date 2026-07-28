@@ -51,4 +51,12 @@ describe("stock routes (integração)", () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe("DIMENSION_MISMATCH");
   });
+
+  test("movements de insumo inexistente → 404", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/supplies/00000000-0000-0000-0000-000000000000/movements",
+    });
+    expect(res.statusCode).toBe(404);
+  });
 });
