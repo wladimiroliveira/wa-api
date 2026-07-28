@@ -9,15 +9,19 @@ import {
 } from "./recipes.schema.js";
 import { assertItemDimension, DimensionMismatchError } from "./recipes.validation.js";
 import * as recipeRepo from "./recipes.repository.js";
-import { getSupply } from "../supplies/supplies.repository.js";
+import { getSuppliesByIds } from "../supplies/supplies.repository.js";
 
-// Valida a dimensão de cada item contra o insumo referenciado. Retorna `true`
-// quando tudo é válido; caso contrário já envia a resposta 400 e retorna `false`.
+// Valida a dimensão de cada item contra o insumo referenciado. Busca todos os
+// supplies de uma vez (evita N+1). Retorna `true` quando tudo é válido; caso
+// contrário já envia a resposta 400 e retorna `false`.
 async function validateItemsDimension(items: RecipeItemInput[], reply: FastifyReply): Promise<boolean> {
+  const supplies = await getSuppliesByIds(items.map((item) => item.supplyId));
+  const suppliesById = new Map(supplies.map((supply) => [supply.id, supply]));
+
   for (const item of items) {
-    const supply = await getSupply(item.supplyId);
+    const supply = suppliesById.get(item.supplyId);
     if (!supply) {
-      reply.status(400).send({ message: `Supply ${item.supplyId} not found` });
+      reply.status(400).send({ message: `Insumo ${item.supplyId} não encontrado` });
       return false;
     }
     try {
@@ -46,7 +50,7 @@ export default async function recipeRoutes(app: FastifyInstance) {
 
   r.get("/recipes/:id", { schema: { params: recipeIdParamSchema } }, async (req, reply) => {
     const recipe = await recipeRepo.getRecipeWithItems(req.params.id);
-    if (!recipe) return reply.status(404).send({ message: "Recipe not found" });
+    if (!recipe) return reply.status(404).send({ message: "Receita não encontrada" });
     return recipe;
   });
 

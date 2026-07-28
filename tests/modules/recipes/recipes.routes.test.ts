@@ -102,8 +102,15 @@ describe("PATCH /recipes/:id (integração)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.items).toHaveLength(2);
-    const usageQtys = body.items.map((i: { usageQty: string }) => i.usageQty).sort();
+    const items = body.items as { supplyId: string; usageQty: string; usageUnit: string }[];
+    const usageQtys = items.map((i) => i.usageQty).sort();
     expect(usageQtys).toEqual(["0.5", "2"]);
+
+    const bySupply = new Map(items.map((i) => [i.supplyId, i]));
+    expect(bySupply.get(supplyId)?.usageUnit).toBe("UN");
+    expect(bySupply.get(otherSupplyId)?.usageUnit).toBe("KG");
+    expect(bySupply.has(supplyId)).toBe(true);
+    expect(bySupply.has(otherSupplyId)).toBe(true);
   });
 
   test("item com dimensão incompatível (ML sobre supply em UN) retorna 400", async () => {
@@ -122,7 +129,10 @@ describe("PATCH /recipes/:id (integração)", () => {
     const res = await app.inject({
       method: "PATCH",
       url: "/recipes/00000000-0000-0000-0000-000000000000",
-      payload: { name: "Não existe" },
+      payload: {
+        name: "Não existe",
+        items: [{ supplyId, usageQty: 1, usageUnit: "UN" }],
+      },
     });
 
     expect(res.statusCode).toBe(404);
