@@ -7,7 +7,7 @@ import {
   recipeIdParamSchema,
   type RecipeItemInput,
 } from "./recipes.schema.js";
-import { assertItemDimension, DimensionMismatchError } from "./recipes.validation.js";
+import { assertItemDimension, DimensionMismatchError } from "../shared/dimension.js";
 import * as recipeRepo from "./recipes.repository.js";
 import { getSuppliesByIds } from "../supplies/supplies.repository.js";
 
