@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",
+    "@fastify/swagger": "9.7.0",
+    "@fastify/swagger-ui": "5.2.5",
     "@prisma/client": "6.19.3",
     "dotenv": "17.4.2",
     "fastify": "5.8.5",
@@ -25,8 +27,6 @@
   "devDependencies": {
     "@commitlint/cli": "20.5.0",
     "@commitlint/config-conventional": "20.5.0",
-    "@fastify/swagger": "9.7.0",
-    "@fastify/swagger-ui": "5.2.5",
     "commitizen": "4.3.1",
     "husky": "9.1.7",
     "prettier": "3.8.3",
