@@ -18,19 +18,16 @@ export default async function stockRoutes(app: FastifyInstance) {
         return reply.status(201).send(result);
       } catch (err) {
         if (err instanceof SupplyNotFoundError) return reply.status(404).send({ message: err.message });
-        if (err instanceof DimensionMismatchError) return reply.status(400).send({ code: err.code, message: err.message });
+        if (err instanceof DimensionMismatchError)
+          return reply.status(400).send({ code: err.code, message: err.message });
         throw err;
       }
     },
   );
 
-  r.get(
-    "/supplies/:id/movements",
-    { schema: { params: supplyIdParamSchema } },
-    async (req, reply) => {
-      const supply = await getSupply(req.params.id);
-      if (!supply) return reply.status(404).send({ message: "Insumo não encontrado" });
-      return listMovements(req.params.id);
-    },
-  );
+  r.get("/supplies/:id/movements", { schema: { params: supplyIdParamSchema } }, async (req, reply) => {
+    const supply = await getSupply(req.params.id);
+    if (!supply) return reply.status(404).send({ message: "Insumo não encontrado" });
+    return listMovements(req.params.id);
+  });
 }

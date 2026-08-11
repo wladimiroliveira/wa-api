@@ -23,6 +23,7 @@
 ### Task 1: Setup — Prisma, PostgreSQL, Vitest e schema inicial
 
 **Files:**
+
 - Create: `prisma/schema.prisma`
 - Create: `src/lib/prisma.ts`
 - Create: `vitest.config.ts`
@@ -33,6 +34,7 @@
 - Create: `.env` (local, não versionado — já ignorado pelo `.gitignore`)
 
 **Interfaces:**
+
 - Produces: `prisma` (default export de `src/lib/prisma.ts`) — instância singleton de `PrismaClient`.
 - Produces: enums/tipos gerados em `src/generated/prisma/index.js` — `PrismaClient`, `Prisma` (namespace com `Prisma.Decimal`), `UnitOfMeasure`, `SupplyType`, e os models `Supply`, `Recipe`, `RecipeItem`.
 
@@ -216,10 +218,12 @@ git commit -m "chore: configura prisma, postgresql e vitest"
 ### Task 2: `shared/unit-of-measure` — metadado e conversão de unidades
 
 **Files:**
+
 - Create: `src/modules/shared/unit-of-measure.ts`
 - Test: `src/modules/shared/unit-of-measure.test.ts`
 
 **Interfaces:**
+
 - Consumes: `UnitOfMeasure`, `Prisma` de `src/generated/prisma/index.js`.
 - Produces:
   - `type Dimension = "WEIGHT" | "VOLUME" | "COUNT"`
@@ -307,10 +311,12 @@ git commit -m "feat: adiciona conversao e dimensao de unidades"
 ### Task 3: `shared/money` — arredondamento monetário exato
 
 **Files:**
+
 - Create: `src/modules/shared/money.ts`
 - Test: `src/modules/shared/money.test.ts`
 
 **Interfaces:**
+
 - Consumes: `Prisma` de `src/generated/prisma/index.js`.
 - Produces:
   - `ONE_REAL: Prisma.Decimal` — passo padrão de R$1,00.
@@ -375,6 +381,7 @@ git commit -m "feat: adiciona arredondamento monetario decimal"
 ### Task 4: Módulo `supplies` — custo do insumo e CRUD
 
 **Files:**
+
 - Create: `src/modules/supplies/supplies.cost.ts` (função pura `costPerBase`)
 - Test: `src/modules/supplies/supplies.cost.test.ts`
 - Create: `src/modules/supplies/supplies.schema.ts` (Zod)
@@ -383,6 +390,7 @@ git commit -m "feat: adiciona arredondamento monetario decimal"
 - Modify: `src/routes.ts` (registrar o router)
 
 **Interfaces:**
+
 - Consumes: `toBase` de `shared/unit-of-measure.js`; `prisma` de `src/lib/prisma.js`; `Prisma`, `UnitOfMeasure`, `SupplyType` do client gerado.
 - Produces:
   - `interface SupplyCostInput { purchasePrice: Prisma.Decimal; purchaseQty: Prisma.Decimal; purchaseUnit: UnitOfMeasure }`
@@ -524,11 +532,7 @@ export function deleteSupply(id: string) {
 ```ts
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import {
-  createSupplySchema,
-  updateSupplySchema,
-  supplyIdParamSchema,
-} from "./supplies.schema.js";
+import { createSupplySchema, updateSupplySchema, supplyIdParamSchema } from "./supplies.schema.js";
 import * as repo from "./supplies.repository.js";
 
 export default async function supplyRoutes(app: FastifyInstance) {
@@ -547,10 +551,8 @@ export default async function supplyRoutes(app: FastifyInstance) {
     return supply;
   });
 
-  r.patch(
-    "/supplies/:id",
-    { schema: { params: supplyIdParamSchema, body: updateSupplySchema } },
-    async (req) => repo.updateSupply(req.params.id, req.body),
+  r.patch("/supplies/:id", { schema: { params: supplyIdParamSchema, body: updateSupplySchema } }, async (req) =>
+    repo.updateSupply(req.params.id, req.body),
   );
 
   r.delete("/supplies/:id", { schema: { params: supplyIdParamSchema } }, async (req, reply) => {
@@ -588,6 +590,7 @@ git commit -m "feat: adiciona modulo supplies com custo e crud"
 ### Task 5: Módulo `recipes` — CRUD, itens e validação de dimensão
 
 **Files:**
+
 - Create: `src/modules/recipes/recipes.validation.ts` (função pura `assertItemDimension`)
 - Test: `src/modules/recipes/recipes.validation.test.ts`
 - Create: `src/modules/recipes/recipes.schema.ts` (Zod)
@@ -596,6 +599,7 @@ git commit -m "feat: adiciona modulo supplies com custo e crud"
 - Modify: `src/routes.ts` (registrar o router)
 
 **Interfaces:**
+
 - Consumes: `sameDimension` de `shared/unit-of-measure.js`; `getSupply` de `supplies/supplies.repository.js`; `prisma`; `Prisma`, `UnitOfMeasure`.
 - Produces:
   - `class DimensionMismatchError extends Error` — com `code = "DIMENSION_MISMATCH"`.
@@ -619,9 +623,7 @@ describe("assertItemDimension", () => {
   });
 
   test("dimensões diferentes (KG comprado, ML usado) lança DimensionMismatchError", () => {
-    expect(() => assertItemDimension(UnitOfMeasure.KG, UnitOfMeasure.ML)).toThrow(
-      DimensionMismatchError,
-    );
+    expect(() => assertItemDimension(UnitOfMeasure.KG, UnitOfMeasure.ML)).toThrow(DimensionMismatchError);
   });
 });
 ```
@@ -739,11 +741,7 @@ export function deleteRecipe(id: string) {
 ```ts
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import {
-  createRecipeSchema,
-  updateMarginSchema,
-  recipeIdParamSchema,
-} from "./recipes.schema.js";
+import { createRecipeSchema, updateMarginSchema, recipeIdParamSchema } from "./recipes.schema.js";
 import { assertItemDimension, DimensionMismatchError } from "./recipes.validation.js";
 import * as recipeRepo from "./recipes.repository.js";
 import { getSupply } from "../supplies/supplies.repository.js";
@@ -779,10 +777,8 @@ export default async function recipeRoutes(app: FastifyInstance) {
     return recipe;
   });
 
-  r.patch(
-    "/recipes/:id/margin",
-    { schema: { params: recipeIdParamSchema, body: updateMarginSchema } },
-    async (req) => recipeRepo.updateMargin(req.params.id, req.body.margin),
+  r.patch("/recipes/:id/margin", { schema: { params: recipeIdParamSchema, body: updateMarginSchema } }, async (req) =>
+    recipeRepo.updateMargin(req.params.id, req.body.margin),
   );
 
   r.delete("/recipes/:id", { schema: { params: recipeIdParamSchema } }, async (req, reply) => {
@@ -822,12 +818,14 @@ git commit -m "feat: adiciona modulo recipes com itens e validacao de dimensao"
 ### Task 6: Módulo `pricing` — cálculo de custo e preço
 
 **Files:**
+
 - Create: `src/modules/pricing/pricing.calc.ts` (função pura `calculatePricing`)
 - Test: `src/modules/pricing/pricing.calc.test.ts`
 - Create: `src/modules/pricing/pricing.routes.ts`
 - Modify: `src/routes.ts` (registrar o router)
 
 **Interfaces:**
+
 - Consumes: `toBase` de `shared/unit-of-measure.js`; `costPerBase`, `SupplyCostInput` de `supplies/supplies.cost.js`; `ONE_REAL`, `roundUpToNearest` de `shared/money.js`; `getRecipeWithItems` de `recipes/recipes.repository.js`; `Prisma`, `UnitOfMeasure`.
 - Produces:
   - `interface RecipeItemForPricing { usageQty: Prisma.Decimal; usageUnit: UnitOfMeasure; supply: SupplyCostInput }`
@@ -1017,6 +1015,7 @@ git commit -m "feat: adiciona modulo pricing com calculo de custo e preco"
 **Files:** nenhum (validação manual da API rodando).
 
 **Interfaces:**
+
 - Consumes: todas as rotas registradas.
 
 - [ ] **Step 1: Subir a API**
@@ -1030,6 +1029,7 @@ Expected: "Server is running"; Swagger em `http://localhost:3333/docs`.
 curl -s -X POST http://localhost:3333/supplies -H "Content-Type: application/json" \
   -d '{"name":"Massa de brigadeiro (lote)","type":"INGREDIENT","purchaseUnit":"UN","purchaseQty":1,"purchasePrice":45.00}'
 ```
+
 Expected: 201 com `id`. Guardar o `id` retornado.
 
 - [ ] **Step 3: Criar uma receita usando esse insumo**
@@ -1038,6 +1038,7 @@ Expected: 201 com `id`. Guardar o `id` retornado.
 curl -s -X POST http://localhost:3333/recipes -H "Content-Type: application/json" \
   -d '{"name":"Brigadeiro tradicional","batchYield":100,"laborCostPerHundred":20.00,"margin":0.60,"items":[{"supplyId":"<ID_DO_INSUMO>","usageQty":1,"usageUnit":"UN"}]}'
 ```
+
 Expected: 201 com `id`. Guardar o `id` da receita.
 
 - [ ] **Step 4: Consultar a precificação**
@@ -1045,6 +1046,7 @@ Expected: 201 com `id`. Guardar o `id` da receita.
 ```bash
 curl -s http://localhost:3333/recipes/<ID_DA_RECEITA>/pricing
 ```
+
 Expected: `totalCostPerHundred: "65.00"`, `pricePerHundred: "104.00"`, `pricePerHalfHundred: "52.00"`.
 
 - [ ] **Step 5: Validar a trava de dimensão (deve falhar)**
@@ -1053,6 +1055,7 @@ Expected: `totalCostPerHundred: "65.00"`, `pricePerHundred: "104.00"`, `pricePer
 curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:3333/recipes -H "Content-Type: application/json" \
   -d '{"name":"Inválida","batchYield":100,"laborCostPerHundred":10,"margin":0.5,"items":[{"supplyId":"<ID_DO_INSUMO>","usageQty":100,"usageUnit":"ML"}]}'
 ```
+
 Expected: `400` (insumo em `UN`/COUNT não aceita consumo em `ML`/VOLUME).
 
 ---

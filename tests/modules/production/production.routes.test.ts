@@ -12,21 +12,38 @@ describe("production routes (integração)", () => {
     app = await buildApp();
     await app.ready();
     // Insumo em UN, com 10 de saldo.
-    supplyId = (await app.inject({
+    supplyId = (
+      await app.inject({
+        method: "POST",
+        url: "/supplies",
+        payload: {
+          name: "Massa (producao)",
+          type: "INGREDIENT",
+          purchaseUnit: "UN",
+          purchaseQty: 1,
+          purchasePrice: 45,
+        },
+      })
+    ).json().id;
+    await app.inject({
       method: "POST",
-      url: "/supplies",
-      payload: { name: "Massa (producao)", type: "INGREDIENT", purchaseUnit: "UN", purchaseQty: 1, purchasePrice: 45 },
-    })).json().id;
-    await app.inject({ method: "POST", url: `/supplies/${supplyId}/stock-entries`, payload: { quantity: 10, unit: "UN" } });
+      url: `/supplies/${supplyId}/stock-entries`,
+      payload: { quantity: 10, unit: "UN" },
+    });
     // Receita: rende 100 un, consome 1 UN por lote.
-    recipeId = (await app.inject({
-      method: "POST",
-      url: "/recipes",
-      payload: {
-        name: "Brigadeiro (producao)", batchYield: 100, laborCostPerHundred: 20, margin: 0.6,
-        items: [{ supplyId, usageQty: 1, usageUnit: "UN" }],
-      },
-    })).json().id;
+    recipeId = (
+      await app.inject({
+        method: "POST",
+        url: "/recipes",
+        payload: {
+          name: "Brigadeiro (producao)",
+          batchYield: 100,
+          laborCostPerHundred: 20,
+          margin: 0.6,
+          items: [{ supplyId, usageQty: 1, usageUnit: "UN" }],
+        },
+      })
+    ).json().id;
   });
 
   afterAll(async () => {

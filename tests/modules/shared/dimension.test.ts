@@ -8,8 +8,6 @@ describe("assertItemDimension", () => {
   });
 
   test("dimensões diferentes (KG comprado, ML usado) lança DimensionMismatchError", () => {
-    expect(() => assertItemDimension(UnitOfMeasure.KG, UnitOfMeasure.ML)).toThrow(
-      DimensionMismatchError,
-    );
+    expect(() => assertItemDimension(UnitOfMeasure.KG, UnitOfMeasure.ML)).toThrow(DimensionMismatchError);
   });
 });

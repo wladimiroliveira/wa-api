@@ -17,7 +17,8 @@ export default async function wasteRoutes(app: FastifyInstance) {
         return reply.status(201).send(result);
       } catch (err) {
         if (err instanceof SupplyNotFoundError) return reply.status(404).send({ message: err.message });
-        if (err instanceof DimensionMismatchError) return reply.status(400).send({ code: err.code, message: err.message });
+        if (err instanceof DimensionMismatchError)
+          return reply.status(400).send({ code: err.code, message: err.message });
         throw err;
       }
     },

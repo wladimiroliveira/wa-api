@@ -16,7 +16,11 @@ describe("waste routes (integração)", () => {
       payload: { name: "Farinha (avaria)", type: "INGREDIENT", purchaseUnit: "KG", purchaseQty: 1, purchasePrice: 5.0 },
     });
     supplyId = res.json().id;
-    await app.inject({ method: "POST", url: `/supplies/${supplyId}/stock-entries`, payload: { quantity: 1, unit: "KG" } }); // 1000 g
+    await app.inject({
+      method: "POST",
+      url: `/supplies/${supplyId}/stock-entries`,
+      payload: { quantity: 1, unit: "KG" },
+    }); // 1000 g
   });
 
   afterAll(async () => {
