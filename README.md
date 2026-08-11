@@ -159,4 +159,6 @@ dependency.
   Portuguese.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/), enforced by commitlint through a Husky
   `commit-msg` hook.
-- Formatting is handled by Prettier (120 columns, double quotes).
+- Formatting is handled by Prettier (120 columns, double quotes) and enforced by a Husky `pre-commit` hook.
+- Every push to `main` and every pull request runs four independent jobs on GitHub Actions — formatting, types,
+  migrations and the test suite — so a failure in one never hides a failure in another.
