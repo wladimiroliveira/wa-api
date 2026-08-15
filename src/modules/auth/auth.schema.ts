@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { usernameSchema } from "../shared/username.js";
 
 export const createSessionSchema = z.object({
-  email: z.string().email(),
+  username: usernameSchema,
   password: z.string().min(1),
 });
 

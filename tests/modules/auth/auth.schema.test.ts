@@ -41,6 +41,7 @@ describe("auth schema", () => {
     const user = await prisma.user.create({
       data: {
         name: "Keeper",
+        username: `keeper-${Date.now()}`,
         email: `keeper-${Date.now()}@example.test`,
         passwordHash: "scrypt:deadbeef:deadbeef",
         roleId: role.id,
@@ -61,6 +62,7 @@ describe("auth schema", () => {
     const user = await prisma.user.create({
       data: {
         name: "Ephemeral",
+        username: `ephemeral-${Date.now()}`,
         email: `ephemeral-${Date.now()}@example.test`,
         passwordHash: "scrypt:deadbeef:deadbeef",
       },

@@ -77,17 +77,18 @@ stops answering.
 
 ### Environment variables
 
-| Variable                 | Description                                          | Example                                                              |
-| ------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------- |
-| `API_PORT`               | Port the HTTP server binds to                        | `3333`                                                               |
-| `DATABASE_URL`           | PostgreSQL connection string                         | `postgresql://postgres:postgres@localhost:5432/wa_api?schema=public` |
-| `JWT_SECRET`             | Access token signing key, at least 32 characters     | `a-long-random-string-with-32-plus-chars`                            |
-| `CORS_ORIGINS`           | Comma-separated list of allowed origins              | `http://localhost:5173`                                              |
-| `ACCESS_TOKEN_TTL`       | Access token lifetime, defaults to `15m`             | `15m`                                                                |
-| `REFRESH_TOKEN_TTL_DAYS` | Refresh token lifetime in days, defaults to `30`     | `30`                                                                 |
-| `LOGIN_RATE_LIMIT_MAX`   | Login attempts per address per 15 min, defaults to 5 | `5`                                                                  |
-| `OWNER_EMAIL`            | First user's email, read only by `db:seed`           | `owner@example.com`                                                  |
-| `OWNER_PASSWORD`         | First user's password, read only by `db:seed`        | `change-this-password`                                               |
+| Variable                 | Description                                           | Example                                                              |
+| ------------------------ | ----------------------------------------------------- | -------------------------------------------------------------------- |
+| `API_PORT`               | Port the HTTP server binds to                         | `3333`                                                               |
+| `DATABASE_URL`           | PostgreSQL connection string                          | `postgresql://postgres:postgres@localhost:5432/wa_api?schema=public` |
+| `JWT_SECRET`             | Access token signing key, at least 32 characters      | `a-long-random-string-with-32-plus-chars`                            |
+| `CORS_ORIGINS`           | Comma-separated list of allowed origins               | `http://localhost:5173`                                              |
+| `ACCESS_TOKEN_TTL`       | Access token lifetime, defaults to `15m`              | `15m`                                                                |
+| `REFRESH_TOKEN_TTL_DAYS` | Refresh token lifetime in days, defaults to `30`      | `30`                                                                 |
+| `LOGIN_RATE_LIMIT_MAX`   | Login attempts per address per 15 min, defaults to 5  | `5`                                                                  |
+| `OWNER_USERNAME`         | First user's login credential, read only by `db:seed` | `owner`                                                              |
+| `OWNER_EMAIL`            | First user's email, read only by `db:seed`            | `owner@example.com`                                                  |
+| `OWNER_PASSWORD`         | First user's password, read only by `db:seed`         | `change-this-password`                                               |
 
 `JWT_SECRET` and `CORS_ORIGINS` are required: the server refuses to start without them.
 
@@ -114,6 +115,10 @@ per module, with read separated from write, through 13 permissions: `SUPPLIES_RE
 `RECIPES_WRITE`, `PRICING_READ`, `STOCK_READ`, `STOCK_WRITE`, `PRODUCTION_READ`, `PRODUCTION_WRITE`, `WASTE_READ`,
 `WASTE_WRITE`, `USERS_READ` and `USERS_WRITE`.
 
+Users log in with a **username**, not an email. The username is 3 to 30 characters of letters, numbers, dot, dash and
+underscore, stored and compared in lowercase — `Maria` and `maria` are the same account, so nobody fails to log in over
+a capital letter. The email stays on the record as required and unique contact information, but it is not a credential.
+
 A user's effective permission is `(role ∪ grantedPermissions) − deniedPermissions` — denial always wins. It is read
 from the database on every request, so a permission change takes effect on the next call, and it is inspectable through
 `GET /users/:id/permissions`.
@@ -122,7 +127,7 @@ from the database on every request, so a permission change takes effect on the n
 # 1. log in
 curl -X POST http://localhost:3333/sessions \
   -H "Content-Type: application/json" \
-  -d '{"email":"owner@example.com","password":"change-this-password"}'
+  -d '{"username":"owner","password":"change-this-password"}'
 # → { "accessToken": "...", "refreshToken": "..." }
 
 # 2. call a protected route

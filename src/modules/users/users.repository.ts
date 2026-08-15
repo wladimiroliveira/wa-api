@@ -6,6 +6,7 @@ import type { CreateUserInput, UpdateUserInput } from "./users.schema.js";
 const publicFields = {
   id: true,
   name: true,
+  username: true,
   email: true,
   roleId: true,
   grantedPermissions: true,

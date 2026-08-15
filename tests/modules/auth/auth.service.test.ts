@@ -20,6 +20,7 @@ describe("auth service (integração)", () => {
     const user = await prisma.user.create({
       data: {
         name: "Service User",
+        username: `service-${crypto.randomUUID().slice(0, 8)}`,
         email: `service-${crypto.randomUUID()}@example.test`,
         passwordHash: await hashPassword(PASSWORD),
         isActive: overrides.isActive ?? true,
@@ -37,23 +38,23 @@ describe("auth service (integração)", () => {
   test("autentica com a senha correta", async () => {
     const user = await createUser();
 
-    expect((await authenticate(user.email, PASSWORD)).id).toBe(user.id);
+    expect((await authenticate(user.username, PASSWORD)).id).toBe(user.id);
   });
 
   test("recusa senha errada", async () => {
     const user = await createUser();
 
-    await expect(authenticate(user.email, "errada")).rejects.toBeInstanceOf(InvalidCredentialsError);
+    await expect(authenticate(user.username, "errada")).rejects.toBeInstanceOf(InvalidCredentialsError);
   });
 
-  test("recusa email inexistente", async () => {
-    await expect(authenticate("ninguem@example.test", PASSWORD)).rejects.toBeInstanceOf(InvalidCredentialsError);
+  test("recusa username inexistente", async () => {
+    await expect(authenticate("ninguem", PASSWORD)).rejects.toBeInstanceOf(InvalidCredentialsError);
   });
 
   test("recusa usuário desativado", async () => {
     const user = await createUser({ isActive: false });
 
-    await expect(authenticate(user.email, PASSWORD)).rejects.toBeInstanceOf(InvalidCredentialsError);
+    await expect(authenticate(user.username, PASSWORD)).rejects.toBeInstanceOf(InvalidCredentialsError);
   });
 
   test("guarda apenas o hash do refresh token", async () => {

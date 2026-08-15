@@ -7,7 +7,7 @@ import { isAuthGuard } from "./auth.guard.js";
 import { findActiveUserWithRole } from "./auth.repository.js";
 
 export type AuthContext = {
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; username: string; email: string };
   permissions: Set<Permission>;
 };
 
@@ -76,7 +76,7 @@ export async function registerAuth(app: FastifyInstance): Promise<void> {
     if (!user) return reply.status(401).send({ message: "Autenticação necessária" });
 
     request.auth = {
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, username: user.username, email: user.email },
       permissions: effectivePermissions({
         rolePermissions: user.role?.permissions ?? [],
         grantedPermissions: user.grantedPermissions,

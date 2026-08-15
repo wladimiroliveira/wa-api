@@ -12,6 +12,7 @@ export async function createActor(app: FastifyInstance, permissions: Permission[
   const user = await prisma.user.create({
     data: {
       name: "Test Actor",
+      username: `actor-${crypto.randomUUID().slice(0, 8)}`,
       email: `actor-${crypto.randomUUID()}@example.test`,
       passwordHash: await hashPassword(`pwd-${crypto.randomUUID()}`),
       grantedPermissions: permissions,
