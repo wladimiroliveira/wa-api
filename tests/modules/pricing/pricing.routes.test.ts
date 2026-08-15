@@ -2,17 +2,21 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../../src/server.js";
 import prisma from "../../../src/lib/prisma.js";
+import { createActor, deleteActor, ALL_PERMISSIONS, type TestActor } from "../../helpers/auth.js";
 
 describe("pricing routes (integração)", () => {
   let app: FastifyInstance;
+  let actor: TestActor;
   let supplyId: string;
   let recipeId: string;
 
   beforeAll(async () => {
     app = await buildApp();
     await app.ready();
+    actor = await createActor(app, ALL_PERMISSIONS);
 
     const supplyRes = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/supplies",
       payload: {
@@ -27,6 +31,7 @@ describe("pricing routes (integração)", () => {
     supplyId = supplyRes.json().id;
 
     const recipeRes = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/recipes",
       payload: {
@@ -46,11 +51,12 @@ describe("pricing routes (integração)", () => {
       await prisma.recipe.delete({ where: { id: recipeId } }).catch((e) => console.warn("cleanup failed (recipe):", e));
     if (supplyId)
       await prisma.supply.delete({ where: { id: supplyId } }).catch((e) => console.warn("cleanup failed (supply):", e));
+    await deleteActor(actor.userId);
     await app.close();
   });
 
   test("GET /recipes/:id/pricing retorna 200 com os valores do brigadeiro", async () => {
-    const res = await app.inject({ method: "GET", url: `/recipes/${recipeId}/pricing` });
+    const res = await app.inject({ headers: actor.headers, method: "GET", url: `/recipes/${recipeId}/pricing` });
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
@@ -61,6 +67,7 @@ describe("pricing routes (integração)", () => {
 
   test("POST /recipes com item de dimensão incompatível (ML sobre supply em UN) retorna 400", async () => {
     const res = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/recipes",
       payload: {
@@ -77,6 +84,7 @@ describe("pricing routes (integração)", () => {
 
   test("GET /recipes/:id/pricing com id inexistente retorna 404", async () => {
     const res = await app.inject({
+      headers: actor.headers,
       method: "GET",
       url: "/recipes/00000000-0000-0000-0000-000000000000/pricing",
     });
@@ -86,6 +94,7 @@ describe("pricing routes (integração)", () => {
 
   test("POST /recipes com body inválido (campo faltando) ainda retorna 400 (error handler não quebra validação do zod)", async () => {
     const res = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/recipes",
       payload: { name: "Sem campos obrigatórios" },
@@ -96,6 +105,7 @@ describe("pricing routes (integração)", () => {
 
   test("PATCH /recipes/:id/margin com id inexistente retorna 404 (P2025 mapeado pelo error handler global)", async () => {
     const res = await app.inject({
+      headers: actor.headers,
       method: "PATCH",
       url: "/recipes/00000000-0000-0000-0000-000000000000/margin",
       payload: { margin: 0.5 },
@@ -108,6 +118,7 @@ describe("pricing routes (integração)", () => {
     // Supply e recipe dedicados: a exclusão é bloqueada pela FK Restrict e não pode
     // deixar o supply/recipe usados nos outros testes em estado inconsistente.
     const supplyRes = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/supplies",
       payload: {
@@ -122,6 +133,7 @@ describe("pricing routes (integração)", () => {
     const referencedSupplyId = supplyRes.json().id;
 
     const recipeRes = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/recipes",
       payload: {
@@ -135,7 +147,11 @@ describe("pricing routes (integração)", () => {
     expect(recipeRes.statusCode).toBe(201);
     const referencedRecipeId = recipeRes.json().id;
 
-    const deleteRes = await app.inject({ method: "DELETE", url: `/supplies/${referencedSupplyId}` });
+    const deleteRes = await app.inject({
+      headers: actor.headers,
+      method: "DELETE",
+      url: `/supplies/${referencedSupplyId}`,
+    });
     expect(deleteRes.statusCode).toBe(409);
 
     await prisma.recipe.delete({ where: { id: referencedRecipeId } });

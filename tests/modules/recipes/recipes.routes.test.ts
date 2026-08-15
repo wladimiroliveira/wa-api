@@ -2,9 +2,11 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../../src/server.js";
 import prisma from "../../../src/lib/prisma.js";
+import { createActor, deleteActor, ALL_PERMISSIONS, type TestActor } from "../../helpers/auth.js";
 
 describe("PATCH /recipes/:id (integração)", () => {
   let app: FastifyInstance;
+  let actor: TestActor;
   let supplyId: string;
   let otherSupplyId: string;
   let recipeId: string;
@@ -12,8 +14,10 @@ describe("PATCH /recipes/:id (integração)", () => {
   beforeAll(async () => {
     app = await buildApp();
     await app.ready();
+    actor = await createActor(app, ALL_PERMISSIONS);
 
     const supplyRes = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/supplies",
       payload: {
@@ -28,6 +32,7 @@ describe("PATCH /recipes/:id (integração)", () => {
     supplyId = supplyRes.json().id;
 
     const otherSupplyRes = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/supplies",
       payload: {
@@ -42,6 +47,7 @@ describe("PATCH /recipes/:id (integração)", () => {
     otherSupplyId = otherSupplyRes.json().id;
 
     const recipeRes = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/recipes",
       payload: {
@@ -65,11 +71,13 @@ describe("PATCH /recipes/:id (integração)", () => {
       await prisma.supply
         .delete({ where: { id: otherSupplyId } })
         .catch((e) => console.warn("cleanup failed (other supply):", e));
+    await deleteActor(actor.userId);
     await app.close();
   });
 
   test("altera name e laborCostPerHundred sem enviar items: retorna 200 e preserva os itens", async () => {
     const res = await app.inject({
+      headers: actor.headers,
       method: "PATCH",
       url: `/recipes/${recipeId}`,
       payload: { name: "Brigadeiro gourmet premium", laborCostPerHundred: 25.0 },
@@ -85,6 +93,7 @@ describe("PATCH /recipes/:id (integração)", () => {
 
   test("envia items novos: substitui os itens existentes", async () => {
     const res = await app.inject({
+      headers: actor.headers,
       method: "PATCH",
       url: `/recipes/${recipeId}`,
       payload: {
@@ -111,6 +120,7 @@ describe("PATCH /recipes/:id (integração)", () => {
 
   test("item com dimensão incompatível (ML sobre supply em UN) retorna 400", async () => {
     const res = await app.inject({
+      headers: actor.headers,
       method: "PATCH",
       url: `/recipes/${recipeId}`,
       payload: {
@@ -123,6 +133,7 @@ describe("PATCH /recipes/:id (integração)", () => {
 
   test("id inexistente com body válido retorna 404 (P2025 mapeado pelo error handler global)", async () => {
     const res = await app.inject({
+      headers: actor.headers,
       method: "PATCH",
       url: "/recipes/00000000-0000-0000-0000-000000000000",
       payload: {

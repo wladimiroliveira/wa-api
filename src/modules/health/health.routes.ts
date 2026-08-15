@@ -5,7 +5,7 @@ import { pingDatabase } from "./health.repository.js";
 export default async function healthRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
 
-  r.get("/health", async (req, reply) => {
+  r.get("/health", { config: { public: true }, schema: { security: [] } }, async (req, reply) => {
     try {
       await pingDatabase();
       return { status: "ok", database: "up" };

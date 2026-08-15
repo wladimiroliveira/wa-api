@@ -2,15 +2,18 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../../src/server.js";
 import prisma from "../../../src/lib/prisma.js";
+import { createActor, deleteActor, ALL_PERMISSIONS, type TestActor } from "../../helpers/auth.js";
 
 const MISSING_ID = "00000000-0000-0000-0000-000000000000";
 
 describe("supplies routes (integração)", () => {
   let app: FastifyInstance;
+  let actor: TestActor;
   const createdIds: string[] = [];
 
   async function createSupply(name: string) {
     const res = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/supplies",
       payload: { name, type: "INGREDIENT", purchaseUnit: "KG", purchaseQty: 2, purchasePrice: 15.5 },
@@ -22,12 +25,14 @@ describe("supplies routes (integração)", () => {
   beforeAll(async () => {
     app = await buildApp();
     await app.ready();
+    actor = await createActor(app, ALL_PERMISSIONS);
   });
 
   afterAll(async () => {
     await prisma.supply
       .deleteMany({ where: { id: { in: createdIds } } })
       .catch((e) => console.warn("cleanup supplies:", e));
+    await deleteActor(actor.userId);
     await app.close();
   });
 
@@ -47,6 +52,7 @@ describe("supplies routes (integração)", () => {
 
   test("rejeita payload inválido com 400", async () => {
     const res = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/supplies",
       payload: { name: "", type: "INGREDIENT", purchaseUnit: "KG", purchaseQty: 0, purchasePrice: 1 },
@@ -58,7 +64,7 @@ describe("supplies routes (integração)", () => {
   test("lista traz o insumo recém-criado", async () => {
     const created = await createSupply("Manteiga (crud)");
 
-    const res = await app.inject({ method: "GET", url: "/supplies" });
+    const res = await app.inject({ headers: actor.headers, method: "GET", url: "/supplies" });
 
     expect(res.statusCode).toBe(200);
     expect(res.json().map((s: { id: string }) => s.id)).toContain(created.json().id);
@@ -67,14 +73,14 @@ describe("supplies routes (integração)", () => {
   test("busca insumo existente por id", async () => {
     const created = await createSupply("Ovos (crud)");
 
-    const res = await app.inject({ method: "GET", url: `/supplies/${created.json().id}` });
+    const res = await app.inject({ headers: actor.headers, method: "GET", url: `/supplies/${created.json().id}` });
 
     expect(res.statusCode).toBe(200);
     expect(res.json().name).toBe("Ovos (crud)");
   });
 
   test("busca de insumo inexistente → 404", async () => {
-    const res = await app.inject({ method: "GET", url: `/supplies/${MISSING_ID}` });
+    const res = await app.inject({ headers: actor.headers, method: "GET", url: `/supplies/${MISSING_ID}` });
 
     expect(res.statusCode).toBe(404);
   });
@@ -83,6 +89,7 @@ describe("supplies routes (integração)", () => {
     const created = await createSupply("Leite (crud)");
 
     const res = await app.inject({
+      headers: actor.headers,
       method: "PATCH",
       url: `/supplies/${created.json().id}`,
       payload: { purchasePrice: 9.9 },
@@ -93,7 +100,12 @@ describe("supplies routes (integração)", () => {
   });
 
   test("edição de insumo inexistente → 404", async () => {
-    const res = await app.inject({ method: "PATCH", url: `/supplies/${MISSING_ID}`, payload: { purchasePrice: 1 } });
+    const res = await app.inject({
+      headers: actor.headers,
+      method: "PATCH",
+      url: `/supplies/${MISSING_ID}`,
+      payload: { purchasePrice: 1 },
+    });
 
     expect(res.statusCode).toBe(404);
   });
@@ -102,15 +114,15 @@ describe("supplies routes (integração)", () => {
     const created = await createSupply("Fermento (crud)");
     const id = created.json().id;
 
-    const del = await app.inject({ method: "DELETE", url: `/supplies/${id}` });
+    const del = await app.inject({ headers: actor.headers, method: "DELETE", url: `/supplies/${id}` });
     expect(del.statusCode).toBe(204);
 
-    const get = await app.inject({ method: "GET", url: `/supplies/${id}` });
+    const get = await app.inject({ headers: actor.headers, method: "GET", url: `/supplies/${id}` });
     expect(get.statusCode).toBe(404);
   });
 
   test("remoção de insumo inexistente → 404", async () => {
-    const res = await app.inject({ method: "DELETE", url: `/supplies/${MISSING_ID}` });
+    const res = await app.inject({ headers: actor.headers, method: "DELETE", url: `/supplies/${MISSING_ID}` });
 
     expect(res.statusCode).toBe(404);
   });
@@ -120,6 +132,7 @@ describe("supplies routes (integração)", () => {
     const supplyId = created.json().id;
 
     const recipe = await app.inject({
+      headers: actor.headers,
       method: "POST",
       url: "/recipes",
       payload: {
@@ -133,7 +146,7 @@ describe("supplies routes (integração)", () => {
     const recipeId = recipe.json().id;
 
     try {
-      const res = await app.inject({ method: "DELETE", url: `/supplies/${supplyId}` });
+      const res = await app.inject({ headers: actor.headers, method: "DELETE", url: `/supplies/${supplyId}` });
       expect(res.statusCode).toBe(409);
     } finally {
       await prisma.recipe.delete({ where: { id: recipeId } }).catch((e) => console.warn("cleanup recipe:", e));
