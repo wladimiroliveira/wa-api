@@ -103,3 +103,27 @@ describe("openapi: pricing", () => {
     expect(responseSchemaOf(app, "get", "/recipes/{id}/pricing", 409)).toBeDefined();
   });
 });
+
+describe("openapi: stock", () => {
+  test("POST /supplies/{id}/stock-entries documenta movimento e saldo", () => {
+    expect(responseSchemaOf(app, "post", "/supplies/{id}/stock-entries", 201)).toMatchObject({
+      type: "object",
+      properties: {
+        movement: { properties: { quantityBase: { type: "number" }, createdAt: { format: "date-time" } } },
+        currentStock: { type: "number" },
+      },
+    });
+  });
+
+  test("POST /supplies/{id}/stock-entries documenta 400 e 404", () => {
+    expect(responseSchemaOf(app, "post", "/supplies/{id}/stock-entries", 400)).toBeDefined();
+    expect(responseSchemaOf(app, "post", "/supplies/{id}/stock-entries", 404)).toBeDefined();
+  });
+
+  test("GET /supplies/{id}/movements documenta a lista do razão", () => {
+    expect(responseSchemaOf(app, "get", "/supplies/{id}/movements", 200)).toMatchObject({
+      type: "array",
+      items: { properties: { type: { type: "string" }, quantityBase: { type: "number" } } },
+    });
+  });
+});

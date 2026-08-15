@@ -1,12 +1,18 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import { createStockEntrySchema, supplyIdParamSchema } from "./stock.schema.js";
+import {
+  createStockEntrySchema,
+  supplyIdParamSchema,
+  stockEntryResponseSchema,
+  stockMovementListResponseSchema,
+} from "./stock.schema.js";
 import { createStockEntry, SupplyNotFoundError } from "./stock.service.js";
 import { DimensionMismatchError } from "../shared/dimension.js";
 import { listMovements } from "./stock.repository.js";
 import { getSupply } from "../supplies/supplies.repository.js";
 import { requirePermission } from "../auth/auth.guard.js";
 import { Permission } from "../../generated/prisma/index.js";
+import { errorSchema, protectedErrors } from "../shared/response.js";
 
 export default async function stockRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -15,7 +21,11 @@ export default async function stockRoutes(app: FastifyInstance) {
     "/supplies/:id/stock-entries",
     {
       preHandler: requirePermission(Permission.STOCK_WRITE),
-      schema: { params: supplyIdParamSchema, body: createStockEntrySchema },
+      schema: {
+        params: supplyIdParamSchema,
+        body: createStockEntrySchema,
+        response: { 201: stockEntryResponseSchema, 400: errorSchema, 404: errorSchema, ...protectedErrors },
+      },
     },
     async (req, reply) => {
       try {
@@ -32,7 +42,13 @@ export default async function stockRoutes(app: FastifyInstance) {
 
   r.get(
     "/supplies/:id/movements",
-    { preHandler: requirePermission(Permission.STOCK_READ), schema: { params: supplyIdParamSchema } },
+    {
+      preHandler: requirePermission(Permission.STOCK_READ),
+      schema: {
+        params: supplyIdParamSchema,
+        response: { 200: stockMovementListResponseSchema, 404: errorSchema, ...protectedErrors },
+      },
+    },
     async (req, reply) => {
       const supply = await getSupply(req.params.id);
       if (!supply) return reply.status(404).send({ message: "Insumo não encontrado" });
