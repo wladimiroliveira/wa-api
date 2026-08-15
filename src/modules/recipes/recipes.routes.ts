@@ -54,20 +54,14 @@ export default async function recipeRoutes(app: FastifyInstance) {
     return recipe;
   });
 
-  r.patch(
-    "/recipes/:id/margin",
-    { schema: { params: recipeIdParamSchema, body: updateMarginSchema } },
-    async (req) => recipeRepo.updateMargin(req.params.id, req.body.margin),
+  r.patch("/recipes/:id/margin", { schema: { params: recipeIdParamSchema, body: updateMarginSchema } }, async (req) =>
+    recipeRepo.updateMargin(req.params.id, req.body.margin),
   );
 
-  r.patch(
-    "/recipes/:id",
-    { schema: { params: recipeIdParamSchema, body: updateRecipeSchema } },
-    async (req, reply) => {
-      if (req.body.items && !(await validateItemsDimension(req.body.items, reply))) return;
-      return recipeRepo.updateRecipe(req.params.id, req.body);
-    },
-  );
+  r.patch("/recipes/:id", { schema: { params: recipeIdParamSchema, body: updateRecipeSchema } }, async (req, reply) => {
+    if (req.body.items && !(await validateItemsDimension(req.body.items, reply))) return;
+    return recipeRepo.updateRecipe(req.params.id, req.body);
+  });
 
   r.delete("/recipes/:id", { schema: { params: recipeIdParamSchema } }, async (req, reply) => {
     await recipeRepo.deleteRecipe(req.params.id);

@@ -13,7 +13,13 @@ describe("stock routes (integração)", () => {
     const res = await app.inject({
       method: "POST",
       url: "/supplies",
-      payload: { name: "Chocolate (estoque)", type: "INGREDIENT", purchaseUnit: "KG", purchaseQty: 1, purchasePrice: 12.0 },
+      payload: {
+        name: "Chocolate (estoque)",
+        type: "INGREDIENT",
+        purchaseUnit: "KG",
+        purchaseQty: 1,
+        purchasePrice: 12.0,
+      },
     });
     supplyId = res.json().id;
   });

@@ -58,13 +58,9 @@ describe("PATCH /recipes/:id (integração)", () => {
 
   afterAll(async () => {
     if (recipeId)
-      await prisma.recipe
-        .delete({ where: { id: recipeId } })
-        .catch((e) => console.warn("cleanup failed (recipe):", e));
+      await prisma.recipe.delete({ where: { id: recipeId } }).catch((e) => console.warn("cleanup failed (recipe):", e));
     if (supplyId)
-      await prisma.supply
-        .delete({ where: { id: supplyId } })
-        .catch((e) => console.warn("cleanup failed (supply):", e));
+      await prisma.supply.delete({ where: { id: supplyId } }).catch((e) => console.warn("cleanup failed (supply):", e));
     if (otherSupplyId)
       await prisma.supply
         .delete({ where: { id: otherSupplyId } })

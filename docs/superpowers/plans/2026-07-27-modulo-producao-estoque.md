@@ -24,9 +24,11 @@
 ### Task 1: Schema — estoque e produção (Prisma + migração)
 
 **Files:**
+
 - Modify: `prisma/schema.prisma`
 
 **Interfaces:**
+
 - Produces (client gerado em `src/generated/prisma`): enums `StockMovementType` (`ENTRY`,`PRODUCTION`,`WASTE`) e `WasteReason` (`SPOILED`,`DROPPED`,`EXPIRED`,`OTHER`); models `StockMovement`, `Production`; `Supply.currentStock: Decimal` e `Supply.movements`; `Recipe.productions`.
 
 - [ ] **Step 1: Editar `prisma/schema.prisma`**
@@ -49,17 +51,20 @@ enum WasteReason {
 ```
 
 Em `model Supply`, adicionar:
+
 ```prisma
   currentStock Decimal        @default(0)
   movements    StockMovement[]
 ```
 
 Em `model Recipe`, adicionar:
+
 ```prisma
   productions Production[]
 ```
 
 Adicionar os dois models:
+
 ```prisma
 model StockMovement {
   id           String            @id @default(uuid())
@@ -108,6 +113,7 @@ git commit -m "feat: adiciona schema de estoque e producao"
 ### Task 2: Refactor — mover validação de dimensão para `shared/dimension.ts`
 
 **Files:**
+
 - Create: `src/modules/shared/dimension.ts`
 - Delete: `src/modules/recipes/recipes.validation.ts`
 - Modify: `src/modules/recipes/recipes.routes.ts` (import)
@@ -116,6 +122,7 @@ git commit -m "feat: adiciona schema de estoque e producao"
 - Move: `tests/modules/recipes/recipes.validation.test.ts` → `tests/modules/shared/dimension.test.ts`
 
 **Interfaces:**
+
 - Produces: `src/modules/shared/dimension.ts` exportando `assertItemDimension(supplyUnit: UnitOfMeasure, usageUnit: UnitOfMeasure): void` e `class DimensionMismatchError extends Error` (com `code = "DIMENSION_MISMATCH"`) — mesmos comportamentos de hoje, reusados por recipes, pricing, stock, waste.
 
 - [ ] **Step 1: Criar `src/modules/shared/dimension.ts`**
@@ -153,6 +160,7 @@ export function assertItemDimension(supplyUnit: UnitOfMeasure, usageUnit: UnitOf
 git rm src/modules/recipes/recipes.validation.ts
 git mv tests/modules/recipes/recipes.validation.test.ts tests/modules/shared/dimension.test.ts
 ```
+
 No teste movido, ajustar o import para `from "../../../src/modules/shared/dimension.js"` (o import do enum Prisma permanece `../../../src/generated/prisma/index.js`).
 
 - [ ] **Step 4: Verificar suíte e tipos**
@@ -172,6 +180,7 @@ git commit -m "refactor: move validacao de dimensao para shared/dimension"
 ### Task 3: Módulo `stock` — ledger, saldo e entrada
 
 **Files:**
+
 - Create: `src/modules/stock/stock.repository.ts`
 - Create: `src/modules/stock/stock.schema.ts`
 - Create: `src/modules/stock/stock.service.ts`
@@ -180,6 +189,7 @@ git commit -m "refactor: move validacao de dimensao para shared/dimension"
 - Test: `tests/modules/stock/stock.routes.test.ts`
 
 **Interfaces:**
+
 - Consumes: `assertItemDimension` de `shared/dimension.js`; `toBase` de `shared/unit-of-measure.js`; `getSupply` de `supplies/supplies.repository.js`; `prisma` de `lib/prisma.js`; `Prisma`, `StockMovementType`, `UnitOfMeasure`.
 - Produces:
   - `applyMovement(tx: Prisma.TransactionClient, input: { supplyId: string; type: StockMovementType; quantityBase: Prisma.Decimal; reason?: WasteReason; note?: string; productionId?: string }): Promise<StockMovement>` — cria a movimentação e atualiza `currentStock` (`increment: quantityBase`). **Usado por waste e production.**
@@ -308,16 +318,15 @@ export default async function stockRoutes(app: FastifyInstance) {
         return reply.status(201).send(result);
       } catch (err) {
         if (err instanceof SupplyNotFoundError) return reply.status(404).send({ message: err.message });
-        if (err instanceof DimensionMismatchError) return reply.status(400).send({ code: err.code, message: err.message });
+        if (err instanceof DimensionMismatchError)
+          return reply.status(400).send({ code: err.code, message: err.message });
         throw err;
       }
     },
   );
 
-  r.get(
-    "/supplies/:id/movements",
-    { schema: { params: supplyIdParamSchema } },
-    async (req) => listMovements(req.params.id),
+  r.get("/supplies/:id/movements", { schema: { params: supplyIdParamSchema } }, async (req) =>
+    listMovements(req.params.id),
   );
 }
 ```
@@ -344,7 +353,13 @@ describe("stock routes (integração)", () => {
     const res = await app.inject({
       method: "POST",
       url: "/supplies",
-      payload: { name: "Chocolate (estoque)", type: "INGREDIENT", purchaseUnit: "KG", purchaseQty: 1, purchasePrice: 12.0 },
+      payload: {
+        name: "Chocolate (estoque)",
+        type: "INGREDIENT",
+        purchaseUnit: "KG",
+        purchaseQty: 1,
+        purchasePrice: 12.0,
+      },
     });
     supplyId = res.json().id;
   });
@@ -402,6 +417,7 @@ git commit -m "feat: adiciona modulo stock com ledger, saldo e entrada"
 ### Task 4: Módulo `waste` — avaria/desperdício
 
 **Files:**
+
 - Create: `src/modules/waste/waste.schema.ts`
 - Create: `src/modules/waste/waste.service.ts`
 - Create: `src/modules/waste/waste.routes.ts`
@@ -409,6 +425,7 @@ git commit -m "feat: adiciona modulo stock com ledger, saldo e entrada"
 - Test: `tests/modules/waste/waste.routes.test.ts`
 
 **Interfaces:**
+
 - Consumes: `applyMovement` de `stock/stock.repository.js`; `getSupply`; `assertItemDimension`, `DimensionMismatchError` de `shared/dimension.js`; `toBase`; `prisma`; `Prisma`, `StockMovementType`, `WasteReason`.
 - Produces:
   - `createWaste(supplyId, { quantity, unit, reason, note? })` (service) — aplica `WASTE` com `quantityBase` **negativo** em transação.
@@ -499,7 +516,8 @@ export default async function wasteRoutes(app: FastifyInstance) {
         return reply.status(201).send(result);
       } catch (err) {
         if (err instanceof SupplyNotFoundError) return reply.status(404).send({ message: err.message });
-        if (err instanceof DimensionMismatchError) return reply.status(400).send({ code: err.code, message: err.message });
+        if (err instanceof DimensionMismatchError)
+          return reply.status(400).send({ code: err.code, message: err.message });
         throw err;
       }
     },
@@ -534,7 +552,11 @@ describe("waste routes (integração)", () => {
       payload: { name: "Farinha (avaria)", type: "INGREDIENT", purchaseUnit: "KG", purchaseQty: 1, purchasePrice: 5.0 },
     });
     supplyId = res.json().id;
-    await app.inject({ method: "POST", url: `/supplies/${supplyId}/stock-entries`, payload: { quantity: 1, unit: "KG" } }); // 1000 g
+    await app.inject({
+      method: "POST",
+      url: `/supplies/${supplyId}/stock-entries`,
+      payload: { quantity: 1, unit: "KG" },
+    }); // 1000 g
   });
 
   afterAll(async () => {
@@ -588,10 +610,12 @@ git commit -m "feat: adiciona modulo waste (avaria) no ledger"
 ### Task 5: `production.calc` — consumo de produção (função pura)
 
 **Files:**
+
 - Create: `src/modules/production/production.calc.ts`
 - Test: `tests/modules/production/production.calc.test.ts`
 
 **Interfaces:**
+
 - Consumes: `toBase` de `shared/unit-of-measure.js`; `Prisma`, `UnitOfMeasure`.
 - Produces:
   - `interface RecipeForProduction { batchYield: Prisma.Decimal; items: { supplyId: string; usageQty: Prisma.Decimal; usageUnit: UnitOfMeasure }[] }`
@@ -689,6 +713,7 @@ git commit -m "feat: adiciona calculo puro de consumo de producao"
 ### Task 6: Módulo `production` — registrar lote (transação + warnings)
 
 **Files:**
+
 - Create: `src/modules/production/production.schema.ts`
 - Create: `src/modules/production/production.repository.ts`
 - Create: `src/modules/production/production.service.ts`
@@ -697,6 +722,7 @@ git commit -m "feat: adiciona calculo puro de consumo de producao"
 - Test: `tests/modules/production/production.routes.test.ts`
 
 **Interfaces:**
+
 - Consumes: `computeConsumption` de `production.calc.js`; `getRecipeWithItems` de `recipes/recipes.repository.js`; `applyMovement` de `stock/stock.repository.js`; `prisma`; `Prisma`, `StockMovementType`.
 - Produces:
   - `registerProduction({ recipeId, batches?, producedQty?, note? })` (service) → `{ production, consumptions, warnings }`; `warnings: { supplyId, resultingStock }[]` (insumos com saldo < 0 pós-produção).
@@ -854,21 +880,38 @@ describe("production routes (integração)", () => {
     app = await buildApp();
     await app.ready();
     // Insumo em UN, com 10 de saldo.
-    supplyId = (await app.inject({
+    supplyId = (
+      await app.inject({
+        method: "POST",
+        url: "/supplies",
+        payload: {
+          name: "Massa (producao)",
+          type: "INGREDIENT",
+          purchaseUnit: "UN",
+          purchaseQty: 1,
+          purchasePrice: 45,
+        },
+      })
+    ).json().id;
+    await app.inject({
       method: "POST",
-      url: "/supplies",
-      payload: { name: "Massa (producao)", type: "INGREDIENT", purchaseUnit: "UN", purchaseQty: 1, purchasePrice: 45 },
-    })).json().id;
-    await app.inject({ method: "POST", url: `/supplies/${supplyId}/stock-entries`, payload: { quantity: 10, unit: "UN" } });
+      url: `/supplies/${supplyId}/stock-entries`,
+      payload: { quantity: 10, unit: "UN" },
+    });
     // Receita: rende 100 un, consome 1 UN por lote.
-    recipeId = (await app.inject({
-      method: "POST",
-      url: "/recipes",
-      payload: {
-        name: "Brigadeiro (producao)", batchYield: 100, laborCostPerHundred: 20, margin: 0.6,
-        items: [{ supplyId, usageQty: 1, usageUnit: "UN" }],
-      },
-    })).json().id;
+    recipeId = (
+      await app.inject({
+        method: "POST",
+        url: "/recipes",
+        payload: {
+          name: "Brigadeiro (producao)",
+          batchYield: 100,
+          laborCostPerHundred: 20,
+          margin: 0.6,
+          items: [{ supplyId, usageQty: 1, usageUnit: "UN" }],
+        },
+      })
+    ).json().id;
   });
 
   afterAll(async () => {
@@ -951,6 +994,7 @@ SID=$(curl -s -X POST http://localhost:3333/supplies -H "Content-Type: applicati
   -d '{"name":"Leite condensado","type":"INGREDIENT","purchaseUnit":"UN","purchaseQty":1,"purchasePrice":4.5}' | sed -E 's/.*"id":"([^"]+)".*/\1/')
 curl -s -X POST http://localhost:3333/supplies/$SID/stock-entries -H "Content-Type: application/json" -d '{"quantity":20,"unit":"UN"}'
 ```
+
 Expected: entrada com `currentStock: "20"`.
 
 - [ ] **Step 3: Registrar avaria e conferir saldo**
@@ -959,6 +1003,7 @@ Expected: entrada com `currentStock: "20"`.
 curl -s -X POST http://localhost:3333/supplies/$SID/wastes -H "Content-Type: application/json" -d '{"quantity":2,"unit":"UN","reason":"EXPIRED"}'
 curl -s http://localhost:3333/supplies/$SID/movements
 ```
+
 Expected: saldo `18`; ledger com `ENTRY` (+20) e `WASTE` (-2).
 
 - [ ] **Step 4: Criar receita e registrar produção**
@@ -968,6 +1013,7 @@ RID=$(curl -s -X POST http://localhost:3333/recipes -H "Content-Type: applicatio
   -d "{\"name\":\"Brigadeiro\",\"batchYield\":100,\"laborCostPerHundred\":20,\"margin\":0.6,\"items\":[{\"supplyId\":\"$SID\",\"usageQty\":1,\"usageUnit\":\"UN\"}]}" | sed -E 's/.*"id":"([^"]+)".*/\1/')
 curl -s -X POST http://localhost:3333/productions -H "Content-Type: application/json" -d "{\"recipeId\":\"$RID\",\"producedQty\":500}"
 ```
+
 Expected: `producedUnits: "500"`, consumo de 5 UN, `warnings: []`; saldo do insumo cai para 13.
 
 - [ ] **Step 5: Produção acima do saldo → warning**
@@ -975,10 +1021,12 @@ Expected: `producedUnits: "500"`, consumo de 5 UN, `warnings: []`; saldo do insu
 ```bash
 curl -s -X POST http://localhost:3333/productions -H "Content-Type: application/json" -d "{\"recipeId\":\"$RID\",\"producedQty\":5000}"
 ```
+
 Expected: 201 com `warnings` listando o insumo com `resultingStock` negativo.
 
 ---
 
 ## Notas de execução
+
 - **Pré-requisito:** Postgres via `docker compose up -d --wait`. Tasks 1, 3, 4, 6 e 7 tocam o banco; a Task 5 (pura) não.
 - **Ordem obrigatória:** Task 1 (schema/migração/client) → Task 2 (refactor) → Task 3 (stock, dá o `applyMovement`) → Tasks 4 e 6 dependem do `applyMovement`; Task 5 (calc) antes da 6.

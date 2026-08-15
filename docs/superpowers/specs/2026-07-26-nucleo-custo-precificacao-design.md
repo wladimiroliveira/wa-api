@@ -42,7 +42,7 @@ Decisão arquitetural central: **nenhuma unidade de medida é texto livre**. Tod
 #### Enum `UnitOfMeasure` (tabela estática, em código — não é dado do usuário)
 
 | Valor | `dimension` | `factorToBase` (→ base canônica) |
-|-------|-------------|----------------------------------|
+| ----- | ----------- | -------------------------------- |
 | `G`   | `WEIGHT`    | 1                                |
 | `KG`  | `WEIGHT`    | 1000                             |
 | `ML`  | `VOLUME`    | 1                                |
@@ -66,46 +66,53 @@ Todo valor monetário é armazenado como **`Decimal` (`NUMERIC` no Postgres)** �
 ## 4. Modelo de domínio
 
 ### 4.1 `Supply` (insumo)
+
 Matéria-prima ou embalagem. Onde nasce o custo.
 
-| Campo | Tipo | Ex. | Observação |
-|-------|------|-----|------------|
-| `name` | string | "Chocolate em pó" | |
-| `type` | `SupplyType` | `INGREDIENT` \| `PACKAGING` | embalagem tratada como insumo, só marcada diferente |
-| `purchaseUnit` | `UnitOfMeasure` | `KG` | enum — sem texto livre |
-| `purchaseQty` | Decimal | `1` | quantas dessas unidades você compra pelo `purchasePrice` |
-| `purchasePrice` | Decimal | `12.00` | preço pago pela compra acima |
+| Campo           | Tipo            | Ex.                         | Observação                                               |
+| --------------- | --------------- | --------------------------- | -------------------------------------------------------- |
+| `name`          | string          | "Chocolate em pó"           |                                                          |
+| `type`          | `SupplyType`    | `INGREDIENT` \| `PACKAGING` | embalagem tratada como insumo, só marcada diferente      |
+| `purchaseUnit`  | `UnitOfMeasure` | `KG`                        | enum — sem texto livre                                   |
+| `purchaseQty`   | Decimal         | `1`                         | quantas dessas unidades você compra pelo `purchasePrice` |
+| `purchasePrice` | Decimal         | `12.00`                     | preço pago pela compra acima                             |
 
 **Custo derivado (não persistido):**
+
 ```
 costPerBase = purchasePrice ÷ (purchaseQty × purchaseUnit.factorToBase)
 ```
+
 Ex. chocolate: `12.00 ÷ (1 × 1000)` = **R$ 0,012/g**.
 
 ### 4.2 `Recipe` (ficha técnica)
+
 A receita/produto vendável.
 
-| Campo | Tipo | Ex. | Observação |
-|-------|------|-----|------------|
-| `name` | string | "Brigadeiro tradicional" | |
-| `batchYield` | Decimal | `100` | unidades produzidas no lote |
-| `laborCostPerHundred` | Decimal | `20.00` | valor fixo arbitrado (mão de obra por cento) |
-| `margin` | Decimal | `0.60` | **obrigatório** — markup por produto |
-| `items` | `RecipeItem[]` | | ingredientes **e** embalagens |
+| Campo                 | Tipo           | Ex.                      | Observação                                   |
+| --------------------- | -------------- | ------------------------ | -------------------------------------------- |
+| `name`                | string         | "Brigadeiro tradicional" |                                              |
+| `batchYield`          | Decimal        | `100`                    | unidades produzidas no lote                  |
+| `laborCostPerHundred` | Decimal        | `20.00`                  | valor fixo arbitrado (mão de obra por cento) |
+| `margin`              | Decimal        | `0.60`                   | **obrigatório** — markup por produto         |
+| `items`               | `RecipeItem[]` |                          | ingredientes **e** embalagens                |
 
 ### 4.3 `RecipeItem`
+
 Consumo de um insumo dentro de uma receita.
 
-| Campo | Tipo | Ex. | Observação |
-|-------|------|-----|------------|
-| `supplyId` | ref | | |
-| `usageQty` | Decimal | `200` | |
-| `usageUnit` | `UnitOfMeasure` | `G` | **validado:** mesma `dimension` do insumo |
+| Campo       | Tipo            | Ex.   | Observação                                |
+| ----------- | --------------- | ----- | ----------------------------------------- |
+| `supplyId`  | ref             |       |                                           |
+| `usageQty`  | Decimal         | `200` |                                           |
+| `usageUnit` | `UnitOfMeasure` | `G`   | **validado:** mesma `dimension` do insumo |
 
 **Custo do item (derivado):**
+
 ```
 itemCost = usageQty × usageUnit.factorToBase × supply.costPerBase
 ```
+
 Ex.: `200 × 1 × 0,012` = **R$ 2,40**.
 
 > **Margem por produto:** não há margem global. Cada `Recipe` possui sua própria `margin` obrigatória, permitindo precificação flexível por produto. A tela de margem por produto mapeia para `PATCH /recipes/:id/margin`.
@@ -115,6 +122,7 @@ Ex.: `200 × 1 × 0,012` = **R$ 2,40**.
 ## 5. Cálculo — do custo ao preço
 
 ### 5.1 Custo
+
 ```
 suppliesCostPerBatch  = Σ itemCost                        (todos os itens da receita)
 suppliesCostPerHundred = suppliesCostPerBatch ÷ (batchYield ÷ 100)
@@ -122,6 +130,7 @@ totalCostPerHundred   = suppliesCostPerHundred + laborCostPerHundred
 ```
 
 ### 5.2 Preço (markup)
+
 ```
 exactPrice          = totalCostPerHundred × (1 + margin)
 pricePerHundred     = roundUpToNearest(exactPrice, R$1,00)
@@ -131,9 +140,10 @@ pricePerHalfHundred = roundUpToNearest(pricePerHundred ÷ 2, R$1,00)
 O sistema expõe **tanto o `exactPrice` quanto o `pricePerHundred` arredondado** (transparência).
 
 ### 5.3 Exemplo ponta a ponta (cento de brigadeiro)
+
 - Insumos no lote de 100 un: R$ 45,00
 - `suppliesCostPerHundred` = 45 ÷ (100÷100) = R$ 45,00
-- + MO R$ 20,00 → `totalCostPerHundred` = **R$ 65,00**
+- - MO R$ 20,00 → `totalCostPerHundred` = **R$ 65,00**
 - margem 60% (markup): `exactPrice` = 65 × 1,60 = R$ 104,00 → `pricePerHundred` = **R$ 104,00**
 - `pricePerHalfHundred` = roundUp(52,00) = **R$ 52,00**
 
@@ -167,6 +177,7 @@ O sistema expõe **tanto o `exactPrice` quanto o `pricePerHundred` arredondado**
 - `src/routes.ts` registra os routers de cada módulo.
 
 ### 7.1 Esboço do schema Prisma
+
 ```prisma
 enum SupplyType { INGREDIENT PACKAGING }
 enum UnitOfMeasure { G KG ML L UN }
@@ -206,14 +217,15 @@ model RecipeItem {
 ```
 
 ### 7.2 Endpoints (REST)
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| POST/GET | `/supplies` | criar / listar |
-| GET/PATCH/DELETE | `/supplies/:id` | detalhe / editar / excluir (com trava §6.5) |
-| POST/GET | `/recipes` | criar / listar |
-| GET/PATCH/DELETE | `/recipes/:id` | detalhe (inclui itens) / editar / excluir |
-| GET | `/recipes/:id/pricing` | **saída-chave:** custo detalhado + `pricePerHundred` + `pricePerHalfHundred` |
-| PATCH | `/recipes/:id/margin` | atualizar margem do produto (tela de margem por produto) |
+
+| Método           | Rota                   | Descrição                                                                    |
+| ---------------- | ---------------------- | ---------------------------------------------------------------------------- |
+| POST/GET         | `/supplies`            | criar / listar                                                               |
+| GET/PATCH/DELETE | `/supplies/:id`        | detalhe / editar / excluir (com trava §6.5)                                  |
+| POST/GET         | `/recipes`             | criar / listar                                                               |
+| GET/PATCH/DELETE | `/recipes/:id`         | detalhe (inclui itens) / editar / excluir                                    |
+| GET              | `/recipes/:id/pricing` | **saída-chave:** custo detalhado + `pricePerHundred` + `pricePerHalfHundred` |
+| PATCH            | `/recipes/:id/margin`  | atualizar margem do produto (tela de margem por produto)                     |
 
 ---
 

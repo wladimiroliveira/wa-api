@@ -1,10 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import {
-  createSupplySchema,
-  updateSupplySchema,
-  supplyIdParamSchema,
-} from "./supplies.schema.js";
+import { createSupplySchema, updateSupplySchema, supplyIdParamSchema } from "./supplies.schema.js";
 import * as repo from "./supplies.repository.js";
 
 export default async function supplyRoutes(app: FastifyInstance) {
@@ -23,10 +19,8 @@ export default async function supplyRoutes(app: FastifyInstance) {
     return supply;
   });
 
-  r.patch(
-    "/supplies/:id",
-    { schema: { params: supplyIdParamSchema, body: updateSupplySchema } },
-    async (req) => repo.updateSupply(req.params.id, req.body),
+  r.patch("/supplies/:id", { schema: { params: supplyIdParamSchema, body: updateSupplySchema } }, async (req) =>
+    repo.updateSupply(req.params.id, req.body),
   );
 
   r.delete("/supplies/:id", { schema: { params: supplyIdParamSchema } }, async (req, reply) => {
