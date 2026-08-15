@@ -116,6 +116,7 @@ describe("supplies routes (integração)", () => {
 
     const del = await app.inject({ headers: actor.headers, method: "DELETE", url: `/supplies/${id}` });
     expect(del.statusCode).toBe(204);
+    expect(del.body).toBe("");
 
     const get = await app.inject({ headers: actor.headers, method: "GET", url: `/supplies/${id}` });
     expect(get.statusCode).toBe(404);
