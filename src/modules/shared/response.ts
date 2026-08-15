@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Prisma.Decimal chega como objeto; valueOf() devolve o número, então coerce resolve sem transform. */
+/** Prisma.Decimal chega como objeto; valueOf() devolve a string numérica, e z.coerce.number() a converte para number sem transform manual. */
 export const decimalSchema = z.coerce.number();
 
 /** Date do Prisma vira ISO 8601 no corpo e `string / date-time` no OpenAPI. */

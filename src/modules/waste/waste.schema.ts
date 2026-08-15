@@ -2,10 +2,6 @@ import { z } from "zod";
 import { unitOfMeasureSchema, supplyResponseSchema } from "../supplies/supplies.schema.js";
 import { stockMovementResponseSchema, wasteReasonSchema } from "../stock/stock.schema.js";
 
-// `createWasteSchema` continua usando `wasteReasonSchema` exatamente como antes.
-// Reexportar mantém compatível qualquer import futuro que espere achá-lo aqui:
-export { wasteReasonSchema };
-
 export const createWasteSchema = z.object({
   quantity: z.number().positive(),
   unit: unitOfMeasureSchema,

@@ -35,7 +35,8 @@ export default async function pricingRoutes(app: FastifyInstance) {
         throw err;
       }
 
-      // Serializa os Decimal como string para preservar exatidão na resposta.
+      // O handler formata cada valor para string (toFixed/toString); na borda,
+      // pricingResponseSchema coerce esses valores de volta para number.
       return {
         suppliesCostPerHundred: result.suppliesCostPerHundred.toFixed(2),
         totalCostPerHundred: result.totalCostPerHundred.toFixed(2),
