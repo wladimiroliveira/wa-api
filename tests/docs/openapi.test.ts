@@ -83,3 +83,23 @@ describe("openapi: recipes", () => {
     expect(responseSchemaOf(app, "delete", "/recipes/{id}", 204)).toBeDefined();
   });
 });
+
+describe("openapi: pricing", () => {
+  test("GET /recipes/{id}/pricing documenta os cinco valores como number", () => {
+    expect(responseSchemaOf(app, "get", "/recipes/{id}/pricing", 200)).toMatchObject({
+      type: "object",
+      properties: {
+        suppliesCostPerHundred: { type: "number" },
+        totalCostPerHundred: { type: "number" },
+        exactPrice: { type: "number" },
+        pricePerHundred: { type: "number" },
+        pricePerHalfHundred: { type: "number" },
+      },
+    });
+  });
+
+  test("GET /recipes/{id}/pricing documenta 404 e 409", () => {
+    expect(responseSchemaOf(app, "get", "/recipes/{id}/pricing", 404)).toBeDefined();
+    expect(responseSchemaOf(app, "get", "/recipes/{id}/pricing", 409)).toBeDefined();
+  });
+});
