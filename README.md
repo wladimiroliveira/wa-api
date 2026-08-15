@@ -151,6 +151,9 @@ permission.
 
 ## API
 
+Every route declares a response schema, so `/docs` carries the full contract of each body — including the error shapes
+per status. The schema is enforced at serialization: a field that is not declared never reaches the client.
+
 | Method   | Endpoint                      | Permission         | Description                                               |
 | -------- | ----------------------------- | ------------------ | --------------------------------------------------------- |
 | `GET`    | `/health`                     | public             | Liveness plus a database ping; `503` when the DB is down  |
@@ -193,7 +196,7 @@ permission.
   dimension (weight, volume, count) and conversion factor to the base unit. Mixing dimensions — using millilitres of a
   supply bought in kilograms — is rejected instead of silently converted.
 - **Decimal arithmetic.** Money and quantities always use `Prisma.Decimal`; JavaScript `number` is never used in
-  calculations.
+  calculations. Only the HTTP boundary converts: response schemas serialize every decimal as a JSON number.
 - **Selling unit.** Prices are expressed per hundred units, with a half hundred derived from it. Both are rounded up to
   the nearest whole currency unit; the exact, unrounded price is returned as well.
 - **Single ledger.** Every stock change — entry, production consumption, waste — goes through `StockMovement` in the same

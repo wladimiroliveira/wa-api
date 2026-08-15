@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../src/server.js";
-import { responseSchemaOf } from "../helpers/openapi.js";
+import { operationsOf, responseSchemaOf } from "../helpers/openapi.js";
 
 let app: FastifyInstance;
 
@@ -245,5 +245,21 @@ describe("openapi: auth", () => {
 
   test("DELETE /sessions documenta o 204", () => {
     expect(responseSchemaOf(app, "delete", "/sessions", 204)).toBeDefined();
+  });
+});
+
+describe("openapi: guarda-corpo", () => {
+  const SUCCESS_STATUSES = ["200", "201", "204"];
+
+  test("toda rota declara schema de resposta para o seu status de sucesso", () => {
+    const missing = operationsOf(app)
+      .filter((op) => !SUCCESS_STATUSES.some((s) => op.responses[s]?.content?.["application/json"]?.schema))
+      .map((op) => `${op.method.toUpperCase()} ${op.path}`);
+
+    expect(missing).toEqual([]);
+  });
+
+  test("o documento cobre as 33 rotas da API", () => {
+    expect(operationsOf(app)).toHaveLength(33);
   });
 });
