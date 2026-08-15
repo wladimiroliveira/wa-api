@@ -47,8 +47,8 @@ npm install
 # 2. create your environment file
 cp .example.env .env
 
-# 3. start PostgreSQL
-docker compose up -d
+# 3. start PostgreSQL and wait until it accepts connections
+npm run services:up
 
 # 4. apply migrations and generate the Prisma client
 npm run db:migrate
@@ -59,6 +59,8 @@ npm run db:seed
 # 6. run the API in watch mode
 npm run dev
 ```
+
+Steps 3 to 6 are also available as a single command once `.env` exists: `npm run dev:full`.
 
 The server listens on `http://localhost:3333` by default and the interactive documentation is available at
 `http://localhost:3333/docs`.
@@ -77,36 +79,49 @@ stops answering.
 
 ### Environment variables
 
-| Variable                 | Description                                           | Example                                                              |
-| ------------------------ | ----------------------------------------------------- | -------------------------------------------------------------------- |
-| `API_PORT`               | Port the HTTP server binds to                         | `3333`                                                               |
-| `DATABASE_URL`           | PostgreSQL connection string                          | `postgresql://postgres:postgres@localhost:5432/wa_api?schema=public` |
-| `JWT_SECRET`             | Access token signing key, at least 32 characters      | `a-long-random-string-with-32-plus-chars`                            |
-| `CORS_ORIGINS`           | Comma-separated list of allowed origins               | `http://localhost:5173`                                              |
-| `ACCESS_TOKEN_TTL`       | Access token lifetime, defaults to `15m`              | `15m`                                                                |
-| `REFRESH_TOKEN_TTL_DAYS` | Refresh token lifetime in days, defaults to `30`      | `30`                                                                 |
-| `LOGIN_RATE_LIMIT_MAX`   | Login attempts per address per 15 min, defaults to 5  | `5`                                                                  |
-| `OWNER_USERNAME`         | First user's login credential, read only by `db:seed` | `owner`                                                              |
-| `OWNER_EMAIL`            | First user's email, read only by `db:seed`            | `owner@example.com`                                                  |
-| `OWNER_PASSWORD`         | First user's password, read only by `db:seed`         | `change-this-password`                                               |
+| Variable                 | Description                                           | Example                                                  |
+| ------------------------ | ----------------------------------------------------- | -------------------------------------------------------- |
+| `API_PORT`               | Port the HTTP server binds to                         | `3333`                                                   |
+| `POSTGRES_USER`          | Role the container is created with                    | `postgres`                                               |
+| `POSTGRES_PASSWORD`      | Password of that role                                 | `postgres`                                               |
+| `POSTGRES_DB`            | Database created on the first boot                    | `wa_api`                                                 |
+| `POSTGRES_HOST`          | Host the API reaches PostgreSQL at                    | `localhost`                                              |
+| `POSTGRES_PORT`          | Port the container publishes on the host              | `5432`                                                   |
+| `DATABASE_URL`           | Connection string assembled from the five above       | `postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@...` |
+| `JWT_SECRET`             | Access token signing key, at least 32 characters      | `a-long-random-string-with-32-plus-chars`                |
+| `CORS_ORIGINS`           | Comma-separated list of allowed origins               | `http://localhost:5173`                                  |
+| `ACCESS_TOKEN_TTL`       | Access token lifetime, defaults to `15m`              | `15m`                                                    |
+| `REFRESH_TOKEN_TTL_DAYS` | Refresh token lifetime in days, defaults to `30`      | `30`                                                     |
+| `LOGIN_RATE_LIMIT_MAX`   | Login attempts per address per 15 min, defaults to 5  | `5`                                                      |
+| `OWNER_USERNAME`         | First user's login credential, read only by `db:seed` | `owner`                                                  |
+| `OWNER_EMAIL`            | First user's email, read only by `db:seed`            | `owner@example.com`                                      |
+| `OWNER_PASSWORD`         | First user's password, read only by `db:seed`         | `change-this-password`                                   |
 
 `JWT_SECRET` and `CORS_ORIGINS` are required: the server refuses to start without them.
 
+`DATABASE_URL` interpolates the five `POSTGRES_*` variables, and `docker-compose.yml` reads the same ones, so the
+credentials live in a single place instead of being repeated on both sides. The container only reads the role, password
+and database name while its data volume is empty — changing them later renames nothing, so drop the volume with
+`npm run services:down -- --volumes` first.
+
 ## Scripts
 
-| Script                        | What it does                               |
-| ----------------------------- | ------------------------------------------ |
-| `npm run dev`                 | Runs the server with `tsx watch`           |
-| `npm run build`               | Compiles TypeScript to `dist/`             |
-| `npm start`                   | Runs the compiled server                   |
-| `npm test`                    | Runs the test suite once                   |
-| `npm run test:watch`          | Runs the tests in watch mode               |
-| `npm run db:migrate`          | Applies migrations in development          |
-| `npm run db:generate`         | Regenerates the Prisma client              |
-| `npm run db:seed`             | Creates the Owner role and the first user  |
-| `npm run lint:prettier:check` | Checks formatting                          |
-| `npm run lint:prettier:fix`   | Fixes formatting                           |
-| `npm run commit`              | Commitizen prompt for conventional commits |
+| Script                        | What it does                                                 |
+| ----------------------------- | ------------------------------------------------------------ |
+| `npm run dev`                 | Runs the server with `tsx watch`                             |
+| `npm run dev:full`            | Brings up the container, migrates, seeds and runs the server |
+| `npm run build`               | Compiles TypeScript to `dist/`                               |
+| `npm start`                   | Runs the compiled server                                     |
+| `npm run services:up`         | Starts PostgreSQL and waits until it is healthy              |
+| `npm run services:down`       | Stops the containers                                         |
+| `npm test`                    | Runs the test suite once                                     |
+| `npm run test:watch`          | Runs the tests in watch mode                                 |
+| `npm run db:migrate`          | Applies migrations in development                            |
+| `npm run db:generate`         | Regenerates the Prisma client                                |
+| `npm run db:seed`             | Creates the Owner role and the first user                    |
+| `npm run lint:prettier:check` | Checks formatting                                            |
+| `npm run lint:prettier:fix`   | Fixes formatting                                             |
+| `npm run commit`              | Commitizen prompt for conventional commits                   |
 
 ## Authentication
 
@@ -211,8 +226,11 @@ per status. The schema is enforced at serialization: a field that is not declare
 src/
   server.ts              # Fastify bootstrap, Swagger, CORS, error handler
   routes.ts              # registers every module's routes
+  lib/env.ts             # loads .env and expands the ${VAR} references inside it
   lib/prisma.ts          # Prisma client instance
   modules/
+    auth/                # login, token rotation and the permission guard
+    users/               # users, roles and effective permissions
     supplies/            # supplies CRUD and unit cost
     recipes/             # recipes and their items
     pricing/             # cost and price calculation
