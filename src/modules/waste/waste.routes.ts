@@ -1,11 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import { createWasteSchema, supplyIdParamSchema } from "./waste.schema.js";
+import { createWasteSchema, supplyIdParamSchema, wasteListResponseSchema } from "./waste.schema.js";
 import { createWaste, listWastes } from "./waste.service.js";
 import { SupplyNotFoundError } from "../stock/stock.service.js";
 import { DimensionMismatchError } from "../shared/dimension.js";
 import { requirePermission } from "../auth/auth.guard.js";
 import { Permission } from "../../generated/prisma/index.js";
+import { errorSchema, protectedErrors } from "../shared/response.js";
+import { stockEntryResponseSchema } from "../stock/stock.schema.js";
 
 export default async function wasteRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -14,7 +16,11 @@ export default async function wasteRoutes(app: FastifyInstance) {
     "/supplies/:id/wastes",
     {
       preHandler: requirePermission(Permission.WASTE_WRITE),
-      schema: { params: supplyIdParamSchema, body: createWasteSchema },
+      schema: {
+        params: supplyIdParamSchema,
+        body: createWasteSchema,
+        response: { 201: stockEntryResponseSchema, 400: errorSchema, 404: errorSchema, ...protectedErrors },
+      },
     },
     async (req, reply) => {
       try {
@@ -29,5 +35,12 @@ export default async function wasteRoutes(app: FastifyInstance) {
     },
   );
 
-  r.get("/wastes", { preHandler: requirePermission(Permission.WASTE_READ) }, async () => listWastes());
+  r.get(
+    "/wastes",
+    {
+      preHandler: requirePermission(Permission.WASTE_READ),
+      schema: { response: { 200: wasteListResponseSchema, ...protectedErrors } },
+    },
+    async () => listWastes(),
+  );
 }

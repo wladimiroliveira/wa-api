@@ -127,3 +127,18 @@ describe("openapi: stock", () => {
     });
   });
 });
+
+describe("openapi: waste", () => {
+  test("POST /supplies/{id}/wastes documenta o mesmo envelope do estoque", () => {
+    expect(responseSchemaOf(app, "post", "/supplies/{id}/wastes", 201)).toMatchObject({
+      properties: { movement: { properties: { reason: {} } }, currentStock: { type: "number" } },
+    });
+  });
+
+  test("GET /wastes documenta o insumo aninhado em cada registro", () => {
+    expect(responseSchemaOf(app, "get", "/wastes", 200)).toMatchObject({
+      type: "array",
+      items: { properties: { supply: { properties: { name: { type: "string" } } } } },
+    });
+  });
+});

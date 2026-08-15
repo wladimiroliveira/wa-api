@@ -43,14 +43,14 @@ describe("waste routes (integração)", () => {
       payload: { quantity: 200, unit: "G", reason: "SPOILED" }, // -200 g
     });
     expect(res.statusCode).toBe(201);
-    expect(res.json().currentStock).toBe("800"); // 1000 - 200
+    expect(res.json().currentStock).toBe(800); // 1000 - 200
 
     const wastes = await app.inject({ headers: actor.headers, method: "GET", url: "/wastes" });
     const mine = wastes.json().filter((w: { supplyId: string }) => w.supplyId === supplyId);
     expect(mine).toHaveLength(1);
     expect(mine[0].type).toBe("WASTE");
     expect(mine[0].reason).toBe("SPOILED");
-    expect(mine[0].quantityBase).toBe("-200");
+    expect(mine[0].quantityBase).toBe(-200);
   });
 
   test("reason ausente → 400 (validação)", async () => {
