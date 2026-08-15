@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { fastifyRateLimit } from "@fastify/rate-limit";
 import { createSessionSchema, refreshSessionSchema } from "./auth.schema.js";
 import { loadAuthConfig } from "./auth.config.js";
 import { requireAuth } from "./auth.guard.js";
@@ -14,13 +15,18 @@ import {
 
 export default async function authRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
-  const { accessTokenTtl } = loadAuthConfig();
+  const { accessTokenTtl, loginRateLimitMax } = loadAuthConfig();
+
+  await app.register(fastifyRateLimit, { global: false });
 
   const signAccessToken = (userId: string) => app.jwt.sign({ sub: userId }, { expiresIn: accessTokenTtl });
 
   r.post(
     "/sessions",
-    { config: { public: true }, schema: { body: createSessionSchema, security: [] } },
+    {
+      config: { public: true, rateLimit: { max: loginRateLimitMax, timeWindow: "15 minutes" } },
+      schema: { body: createSessionSchema, security: [] },
+    },
     async (req, reply) => {
       try {
         const user = await authenticate(req.body.email, req.body.password);

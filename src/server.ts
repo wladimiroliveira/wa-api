@@ -9,6 +9,7 @@ import { fastifyCors } from "@fastify/cors";
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform, ZodTypeProvider } from "fastify-type-provider-zod";
 import { Prisma } from "./generated/prisma/index.js";
 import { registerAuth } from "./modules/auth/auth.plugin.js";
+import { loadAuthConfig } from "./modules/auth/auth.config.js";
 
 function errorHandler(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -31,8 +32,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
+  const { corsOrigins } = loadAuthConfig();
+
   await app.register(fastifyCors, {
-    origin: ["*"],
+    origin: corsOrigins,
     methods: ["GET", "POST", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   });
