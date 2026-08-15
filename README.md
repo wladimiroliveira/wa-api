@@ -18,6 +18,7 @@ Supply ──► Recipe ──► cost per hundred ──► price (markup)
 - **Production** — registers produced batches and automatically consumes the recipe's supplies.
 - **Waste** — records spoilage and losses against the same ledger.
 - **OpenAPI docs** — interactive Swagger UI served by the app itself.
+- **Health check** — `/health` answers only while the database answers, so orchestrators see the real state.
 
 ## Tech stack
 
@@ -59,6 +60,18 @@ npm run dev
 The server listens on `http://localhost:3333` by default and the interactive documentation is available at
 `http://localhost:3333/docs`.
 
+### Running the packaged image
+
+```bash
+docker build -t wa-api .
+docker run -p 3333:3333 -e DATABASE_URL="postgresql://user:pass@host:5432/wa_api?schema=public" wa-api
+```
+
+The image ships only the compiled application and its runtime dependencies. Migrations are **not** applied on start —
+run `npx prisma migrate deploy` as a deployment step, so concurrent containers never race for the same migration. The
+container declares a `HEALTHCHECK` that polls `/health`, so an orchestrator sees it as unhealthy whenever the database
+stops answering.
+
 ### Environment variables
 
 | Variable       | Description                   | Example                                                              |
@@ -85,6 +98,7 @@ The server listens on `http://localhost:3333` by default and the interactive doc
 
 | Method   | Endpoint                      | Description                                               |
 | -------- | ----------------------------- | --------------------------------------------------------- |
+| `GET`    | `/health`                     | Liveness plus a database ping; `503` when the DB is down  |
 | `GET`    | `/supplies`                   | Lists supplies                                            |
 | `POST`   | `/supplies`                   | Creates a supply                                          |
 | `GET`    | `/supplies/:id`               | Gets a supply                                             |
@@ -134,6 +148,7 @@ src/
     stock/               # ledger and stock entries
     waste/               # waste records
     production/          # production registration and consumption
+    health/              # liveness and database ping
     shared/              # units, dimensions and money helpers
 prisma/                  # schema and migrations
 tests/                   # unit and integration tests
