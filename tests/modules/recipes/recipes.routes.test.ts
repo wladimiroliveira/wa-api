@@ -86,7 +86,7 @@ describe("PATCH /recipes/:id (integração)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.name).toBe("Brigadeiro gourmet premium");
-    expect(body.laborCostPerHundred).toBe("25");
+    expect(body.laborCostPerHundred).toBe(25);
     expect(body.items).toHaveLength(1);
     expect(body.items[0].supplyId).toBe(supplyId);
   });
@@ -107,9 +107,9 @@ describe("PATCH /recipes/:id (integração)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.items).toHaveLength(2);
-    const items = body.items as { supplyId: string; usageQty: string; usageUnit: string }[];
+    const items = body.items as { supplyId: string; usageQty: number; usageUnit: string }[];
     const usageQtys = items.map((i) => i.usageQty).sort();
-    expect(usageQtys).toEqual(["0.5", "2"]);
+    expect(usageQtys).toEqual([0.5, 2]);
 
     const bySupply = new Map(items.map((i) => [i.supplyId, i]));
     expect(bySupply.get(supplyId)?.usageUnit).toBe("UN");

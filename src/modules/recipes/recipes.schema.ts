@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { unitOfMeasureSchema } from "../supplies/supplies.schema.js";
+import { supplyResponseSchema, unitOfMeasureSchema } from "../supplies/supplies.schema.js";
+import { decimalSchema, timestampSchema } from "../shared/response.js";
 
 export const recipeItemSchema = z.object({
   supplyId: z.string().uuid(),
@@ -30,3 +31,33 @@ export const recipeIdParamSchema = z.object({ id: z.string().uuid() });
 export type RecipeItemInput = z.infer<typeof recipeItemSchema>;
 export type CreateRecipeInput = z.infer<typeof createRecipeSchema>;
 export type UpdateRecipeInput = z.infer<typeof updateRecipeSchema>;
+
+export const recipeResponseSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  batchYield: decimalSchema,
+  laborCostPerHundred: decimalSchema,
+  margin: decimalSchema,
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+});
+
+export const recipeListResponseSchema = z.array(recipeResponseSchema);
+
+export const recipeItemResponseSchema = z.object({
+  id: z.string().uuid(),
+  recipeId: z.string().uuid(),
+  supplyId: z.string().uuid(),
+  usageQty: decimalSchema,
+  usageUnit: unitOfMeasureSchema,
+});
+
+/** POST e PATCH devolvem `include: { items: true }` — item sem o insumo. */
+export const recipeWithItemsResponseSchema = recipeResponseSchema.extend({
+  items: z.array(recipeItemResponseSchema),
+});
+
+/** GET /recipes/:id usa getRecipeWithItems, que aninha o insumo em cada item. */
+export const recipeDetailResponseSchema = recipeResponseSchema.extend({
+  items: z.array(recipeItemResponseSchema.extend({ supply: supplyResponseSchema })),
+});

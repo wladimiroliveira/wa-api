@@ -46,3 +46,40 @@ describe("openapi: supplies", () => {
     expect(responseSchemaOf(app, "delete", "/supplies/{id}", 204)).toBeDefined();
   });
 });
+
+describe("openapi: recipes", () => {
+  test("GET /recipes documenta a lista sem itens", () => {
+    const schema = responseSchemaOf(app, "get", "/recipes", 200) as { items: { properties: object } };
+    expect(schema).toMatchObject({ type: "array", items: { properties: { margin: { type: "number" } } } });
+    expect(schema.items.properties).not.toHaveProperty("items");
+  });
+
+  test("POST /recipes documenta os itens sem o insumo aninhado", () => {
+    const schema = responseSchemaOf(app, "post", "/recipes", 201) as {
+      properties: { items: { items: { properties: object } } };
+    };
+    expect(schema.properties.items.items.properties).toMatchObject({ usageQty: { type: "number" } });
+    expect(schema.properties.items.items.properties).not.toHaveProperty("supply");
+  });
+
+  test("GET /recipes/{id} documenta o insumo aninhado em cada item", () => {
+    expect(responseSchemaOf(app, "get", "/recipes/{id}", 200)).toMatchObject({
+      properties: {
+        items: {
+          type: "array",
+          items: { properties: { supply: { properties: { purchasePrice: { type: "number" } } } } },
+        },
+      },
+    });
+  });
+
+  test("PATCH /recipes/{id}/margin documenta a receita sem itens", () => {
+    expect(responseSchemaOf(app, "patch", "/recipes/{id}/margin", 200)).toMatchObject({
+      properties: { margin: { type: "number" } },
+    });
+  });
+
+  test("DELETE /recipes/{id} documenta o 204", () => {
+    expect(responseSchemaOf(app, "delete", "/recipes/{id}", 204)).toBeDefined();
+  });
+});
