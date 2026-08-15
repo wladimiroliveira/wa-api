@@ -86,7 +86,7 @@ describe("PATCH /recipes/:id (integração)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.name).toBe("Brigadeiro gourmet premium");
-    expect(body.laborCostPerHundred).toBe("25");
+    expect(body.laborCostPerHundred).toBe(25);
     expect(body.items).toHaveLength(1);
     expect(body.items[0].supplyId).toBe(supplyId);
   });
@@ -107,9 +107,9 @@ describe("PATCH /recipes/:id (integração)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.items).toHaveLength(2);
-    const items = body.items as { supplyId: string; usageQty: string; usageUnit: string }[];
+    const items = body.items as { supplyId: string; usageQty: number; usageUnit: string }[];
     const usageQtys = items.map((i) => i.usageQty).sort();
-    expect(usageQtys).toEqual(["0.5", "2"]);
+    expect(usageQtys).toEqual([0.5, 2]);
 
     const bySupply = new Map(items.map((i) => [i.supplyId, i]));
     expect(bySupply.get(supplyId)?.usageUnit).toBe("UN");
@@ -143,5 +143,95 @@ describe("PATCH /recipes/:id (integração)", () => {
     });
 
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe("GET/DELETE /recipes (integração)", () => {
+  let app: FastifyInstance;
+  let actor: TestActor;
+  let supplyId: string;
+  let recipeId: string;
+
+  beforeAll(async () => {
+    app = await buildApp();
+    await app.ready();
+    actor = await createActor(app, ALL_PERMISSIONS);
+
+    const supplyRes = await app.inject({
+      headers: actor.headers,
+      method: "POST",
+      url: "/supplies",
+      payload: {
+        name: "Leite condensado",
+        type: "INGREDIENT",
+        purchaseUnit: "UN",
+        purchaseQty: 1,
+        purchasePrice: 8.5,
+      },
+    });
+    expect(supplyRes.statusCode).toBe(201);
+    supplyId = supplyRes.json().id;
+
+    const recipeRes = await app.inject({
+      headers: actor.headers,
+      method: "POST",
+      url: "/recipes",
+      payload: {
+        name: "Brigadeiro tradicional",
+        batchYield: 50,
+        laborCostPerHundred: 15.0,
+        margin: 0.5,
+        items: [{ supplyId, usageQty: 1, usageUnit: "UN" }],
+      },
+    });
+    expect(recipeRes.statusCode).toBe(201);
+    recipeId = recipeRes.json().id;
+  });
+
+  afterAll(async () => {
+    if (recipeId)
+      await prisma.recipe.delete({ where: { id: recipeId } }).catch((e) => console.warn("cleanup failed (recipe):", e));
+    if (supplyId)
+      await prisma.supply.delete({ where: { id: supplyId } }).catch((e) => console.warn("cleanup failed (supply):", e));
+    await deleteActor(actor.userId);
+    await app.close();
+  });
+
+  test("GET /recipes/:id retorna 200 com o insumo completo aninhado em cada item", async () => {
+    const res = await app.inject({ headers: actor.headers, method: "GET", url: `/recipes/${recipeId}` });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.items).toHaveLength(1);
+    const supply = body.items[0].supply;
+    expect(supply.id).toBe(supplyId);
+    expect(typeof supply.purchasePrice).toBe("number");
+    expect(typeof supply.purchaseQty).toBe("number");
+    expect(typeof supply.currentStock).toBe("number");
+    expect(typeof supply.createdAt).toBe("string");
+    expect(new Date(supply.createdAt).toISOString()).toBe(supply.createdAt);
+  });
+
+  test("GET /recipes retorna 200 com margin e batchYield numéricos e sem items", async () => {
+    const res = await app.inject({ headers: actor.headers, method: "GET", url: "/recipes" });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    const found = body.find((r: { id: string }) => r.id === recipeId);
+    expect(found).toBeDefined();
+    expect(typeof found.margin).toBe("number");
+    expect(typeof found.batchYield).toBe("number");
+    expect(found).not.toHaveProperty("items");
+  });
+
+  test("DELETE /recipes/:id retorna 204 sem corpo e remove a receita", async () => {
+    const del = await app.inject({ headers: actor.headers, method: "DELETE", url: `/recipes/${recipeId}` });
+    expect(del.statusCode).toBe(204);
+    expect(del.body).toBe("");
+
+    const get = await app.inject({ headers: actor.headers, method: "GET", url: `/recipes/${recipeId}` });
+    expect(get.statusCode).toBe(404);
+
+    recipeId = "";
   });
 });

@@ -72,12 +72,12 @@ describe("production routes (integração)", () => {
     });
     expect(res.statusCode).toBe(201);
     const body = res.json();
-    expect(body.production.producedUnits).toBe("300");
-    expect(body.consumptions.find((c: { supplyId: string }) => c.supplyId === supplyId).consumedBase).toBe("3");
+    expect(body.production.producedUnits).toBe(300);
+    expect(body.consumptions.find((c: { supplyId: string }) => c.supplyId === supplyId).consumedBase).toBe(3);
     expect(body.warnings).toHaveLength(0);
 
     const supply = await app.inject({ headers: actor.headers, method: "GET", url: `/supplies/${supplyId}` });
-    expect(supply.json().currentStock).toBe("7");
+    expect(supply.json().currentStock).toBe(7);
   });
 
   test("produção além do saldo registra e retorna warning de saldo negativo", async () => {
@@ -91,7 +91,7 @@ describe("production routes (integração)", () => {
     expect(res.statusCode).toBe(201);
     const warning = res.json().warnings.find((w: { supplyId: string }) => w.supplyId === supplyId);
     expect(warning).toBeDefined();
-    expect(warning.resultingStock).toBe("-3");
+    expect(warning.resultingStock).toBe(-3);
   });
 
   test("GET /productions retorna lista contendo a produção criada", async () => {
@@ -123,7 +123,7 @@ describe("production routes (integração)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(Array.isArray(body.movements)).toBe(true);
-    expect(body.producedUnits).toBe("100");
+    expect(body.producedUnits).toBe(100);
   });
 
   test("GET /productions/:id inexistente → 404", async () => {

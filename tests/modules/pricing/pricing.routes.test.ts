@@ -60,9 +60,9 @@ describe("pricing routes (integração)", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.totalCostPerHundred).toBe("65.00");
-    expect(body.pricePerHundred).toBe("104.00");
-    expect(body.pricePerHalfHundred).toBe("52.00");
+    expect(body.totalCostPerHundred).toBe(65);
+    expect(body.pricePerHundred).toBe(104);
+    expect(body.pricePerHalfHundred).toBe(52);
   });
 
   test("POST /recipes com item de dimensão incompatível (ML sobre supply em UN) retorna 400", async () => {

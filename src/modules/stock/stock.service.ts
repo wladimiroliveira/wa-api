@@ -30,6 +30,7 @@ export async function createStockEntry(supplyId: string, data: CreateStockEntryI
     }),
   );
 
+  // O insumo foi validado no início; o saldo sempre existe aqui.
   const updated = await getSupply(supplyId);
-  return { movement, currentStock: updated?.currentStock };
+  return { movement, currentStock: updated!.currentStock };
 }

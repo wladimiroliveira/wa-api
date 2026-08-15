@@ -43,10 +43,10 @@ describe("stock routes (integração)", () => {
       payload: { quantity: 2, unit: "KG" }, // 2 KG = 2000 g
     });
     expect(entry.statusCode).toBe(201);
-    expect(entry.json().currentStock).toBe("2000");
+    expect(entry.json().currentStock).toBe(2000);
 
     const supply = await app.inject({ headers: actor.headers, method: "GET", url: `/supplies/${supplyId}` });
-    expect(supply.json().currentStock).toBe("2000");
+    expect(supply.json().currentStock).toBe(2000);
 
     const movements = await app.inject({
       headers: actor.headers,
@@ -55,7 +55,7 @@ describe("stock routes (integração)", () => {
     });
     expect(movements.json()).toHaveLength(1);
     expect(movements.json()[0].type).toBe("ENTRY");
-    expect(movements.json()[0].quantityBase).toBe("2000");
+    expect(movements.json()[0].quantityBase).toBe(2000);
   });
 
   test("dimensão incompatível (insumo em KG, entrada em ML) → 400", async () => {
