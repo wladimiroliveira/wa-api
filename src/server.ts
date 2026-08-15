@@ -14,6 +14,8 @@ import { loadAuthConfig } from "./modules/auth/auth.config.js";
 function errorHandler(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2025") return reply.status(404).send({ message: "Recurso não encontrado" });
+    if (error.code === "P2002")
+      return reply.status(409).send({ message: "Já existe um registro com esse valor único" });
     if (error.code === "P2003") return reply.status(409).send({ message: "Operação viola uma referência existente" });
   }
 
