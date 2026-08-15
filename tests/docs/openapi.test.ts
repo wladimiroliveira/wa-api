@@ -176,3 +176,21 @@ describe("openapi: health", () => {
     }
   });
 });
+
+describe("openapi: roles", () => {
+  test("GET /roles documenta a lista com o pacote de permissões", () => {
+    expect(responseSchemaOf(app, "get", "/roles", 200)).toMatchObject({
+      type: "array",
+      items: { properties: { name: { type: "string" }, permissions: { type: "array" } } },
+    });
+  });
+
+  test("POST /roles documenta 201 e o 409 de nome duplicado", () => {
+    expect(responseSchemaOf(app, "post", "/roles", 201)).toBeDefined();
+    expect(responseSchemaOf(app, "post", "/roles", 409)).toBeDefined();
+  });
+
+  test("DELETE /roles/{id} documenta o 204", () => {
+    expect(responseSchemaOf(app, "delete", "/roles/{id}", 204)).toBeDefined();
+  });
+});
