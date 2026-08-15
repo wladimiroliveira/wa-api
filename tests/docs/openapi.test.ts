@@ -42,8 +42,17 @@ describe("openapi: supplies", () => {
     }
   });
 
+  // `noContentSchema` é `z.void()`, que o OpenAPI documenta como um schema vazio
+  // (`{}`) — sem restrição nenhuma, então qualquer corpo "passaria". É o custo
+  // conhecido de cair para `z.void()`: `z.null()` falha o `tsc` contra
+  // `reply.status(204).send()`, que o type provider só tipa como 0 argumentos
+  // quando o schema é void. O runtime não é afetado — HTTP proíbe corpo em 204 —
+  // mas o documento fica menos preciso do que poderia. A asserção abaixo, além do
+  // `toBeDefined()`, fixa o que é documentado hoje: se `noContentSchema` mudar,
+  // o teste acusa a diferença em vez de continuar passando calado.
   test("DELETE /supplies/{id} documenta o 204", () => {
     expect(responseSchemaOf(app, "delete", "/supplies/{id}", 204)).toBeDefined();
+    expect(responseSchemaOf(app, "delete", "/supplies/{id}", 204)).toEqual({});
   });
 
   test("DELETE /supplies/{id} documenta o 409 de insumo em uso", () => {
@@ -85,6 +94,7 @@ describe("openapi: recipes", () => {
 
   test("DELETE /recipes/{id} documenta o 204", () => {
     expect(responseSchemaOf(app, "delete", "/recipes/{id}", 204)).toBeDefined();
+    expect(responseSchemaOf(app, "delete", "/recipes/{id}", 204)).toEqual({});
   });
 
   test("DELETE /recipes/{id} documenta o 409 de receita em uso", () => {
@@ -200,6 +210,7 @@ describe("openapi: roles", () => {
 
   test("DELETE /roles/{id} documenta o 204", () => {
     expect(responseSchemaOf(app, "delete", "/roles/{id}", 204)).toBeDefined();
+    expect(responseSchemaOf(app, "delete", "/roles/{id}", 204)).toEqual({});
   });
 });
 
@@ -253,6 +264,7 @@ describe("openapi: auth", () => {
 
   test("DELETE /sessions documenta o 204", () => {
     expect(responseSchemaOf(app, "delete", "/sessions", 204)).toBeDefined();
+    expect(responseSchemaOf(app, "delete", "/sessions", 204)).toEqual({});
   });
 });
 
