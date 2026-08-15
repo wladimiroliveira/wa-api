@@ -27,6 +27,7 @@
     "@fastify/swagger-ui": "5.2.5",
     "@prisma/client": "6.19.3",
     "dotenv": "17.4.2",
+    "dotenv-expand": "1000.0.0",
     "fastify": "5.8.5",
     "fastify-type-provider-zod": "6.1.0",
     "zod": "4.3.6"

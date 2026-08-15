@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../src/lib/env.js";
 import prisma from "../src/lib/prisma.js";
 import { hashPassword } from "../src/modules/auth/auth.password.js";
 import { Permission } from "../src/generated/prisma/index.js";
