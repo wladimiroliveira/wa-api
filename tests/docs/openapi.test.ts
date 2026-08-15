@@ -142,3 +142,26 @@ describe("openapi: waste", () => {
     });
   });
 });
+
+describe("openapi: production", () => {
+  test("POST /productions documenta produção, consumos e avisos", () => {
+    expect(responseSchemaOf(app, "post", "/productions", 201)).toMatchObject({
+      type: "object",
+      properties: {
+        production: { properties: { factor: { type: "number" }, producedUnits: { type: "number" } } },
+        consumptions: { type: "array", items: { properties: { consumedBase: { type: "number" } } } },
+        warnings: { type: "array", items: { properties: { resultingStock: { type: "number" } } } },
+      },
+    });
+  });
+
+  test("POST /productions documenta o 404 de receita inexistente", () => {
+    expect(responseSchemaOf(app, "post", "/productions", 404)).toBeDefined();
+  });
+
+  test("GET /productions/{id} documenta os movimentos gerados", () => {
+    expect(responseSchemaOf(app, "get", "/productions/{id}", 200)).toMatchObject({
+      properties: { movements: { type: "array", items: { properties: { quantityBase: { type: "number" } } } } },
+    });
+  });
+});
