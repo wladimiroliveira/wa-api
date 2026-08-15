@@ -74,7 +74,7 @@ export default async function supplyRoutes(app: FastifyInstance) {
       preHandler: requirePermission(Permission.SUPPLIES_WRITE),
       schema: {
         params: supplyIdParamSchema,
-        response: { 204: noContentSchema, 404: errorSchema, ...protectedErrors },
+        response: { 204: noContentSchema, 404: errorSchema, 409: errorSchema, ...protectedErrors },
       },
     },
     async (req, reply) => {

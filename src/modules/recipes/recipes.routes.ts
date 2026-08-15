@@ -123,7 +123,7 @@ export default async function recipeRoutes(app: FastifyInstance) {
       preHandler: requirePermission(Permission.RECIPES_WRITE),
       schema: {
         params: recipeIdParamSchema,
-        response: { 204: noContentSchema, 404: errorSchema, ...protectedErrors },
+        response: { 204: noContentSchema, 404: errorSchema, 409: errorSchema, ...protectedErrors },
       },
     },
     async (req, reply) => {

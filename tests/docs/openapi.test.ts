@@ -45,6 +45,10 @@ describe("openapi: supplies", () => {
   test("DELETE /supplies/{id} documenta o 204", () => {
     expect(responseSchemaOf(app, "delete", "/supplies/{id}", 204)).toBeDefined();
   });
+
+  test("DELETE /supplies/{id} documenta o 409 de insumo em uso", () => {
+    expect(responseSchemaOf(app, "delete", "/supplies/{id}", 409)).toBeDefined();
+  });
 });
 
 describe("openapi: recipes", () => {
@@ -81,6 +85,10 @@ describe("openapi: recipes", () => {
 
   test("DELETE /recipes/{id} documenta o 204", () => {
     expect(responseSchemaOf(app, "delete", "/recipes/{id}", 204)).toBeDefined();
+  });
+
+  test("DELETE /recipes/{id} documenta o 409 de receita em uso", () => {
+    expect(responseSchemaOf(app, "delete", "/recipes/{id}", 409)).toBeDefined();
   });
 });
 
