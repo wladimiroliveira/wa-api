@@ -195,6 +195,25 @@ describe("openapi: roles", () => {
   });
 });
 
+describe("openapi: users", () => {
+  test("GET /users documenta a lista sem passwordHash", () => {
+    const schema = responseSchemaOf(app, "get", "/users", 200) as { items: { properties: object } };
+    expect(schema.items.properties).toMatchObject({ username: { type: "string" }, isActive: { type: "boolean" } });
+    expect(schema.items.properties).not.toHaveProperty("passwordHash");
+  });
+
+  test("GET /users/{id}/permissions documenta as permissões já computadas", () => {
+    expect(responseSchemaOf(app, "get", "/users/{id}/permissions", 200)).toMatchObject({
+      type: "object",
+      properties: { userId: { type: "string" }, permissions: { type: "array" } },
+    });
+  });
+
+  test("POST /users documenta o 409 de username duplicado", () => {
+    expect(responseSchemaOf(app, "post", "/users", 409)).toBeDefined();
+  });
+});
+
 describe("openapi: auth", () => {
   test("POST /sessions documenta o par de tokens", () => {
     expect(responseSchemaOf(app, "post", "/sessions", 200)).toMatchObject({

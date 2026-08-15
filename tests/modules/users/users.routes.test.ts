@@ -185,6 +185,23 @@ describe("users routes (integração)", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  test("nenhuma rota de usuário devolve o hash da senha", async () => {
+    const created = await createUser({
+      name: "Leak Check",
+      username: `leak-${crypto.randomUUID().slice(0, 8)}`,
+      email: `leak-${crypto.randomUUID()}@example.test`,
+      password: "senha-com-8-ou-mais",
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).not.toHaveProperty("passwordHash");
+
+    const fetched = await app.inject({ headers: admin.headers, method: "GET", url: `/users/${created.json().id}` });
+    expect(fetched.json()).not.toHaveProperty("passwordHash");
+
+    const listed = await app.inject({ headers: admin.headers, method: "GET", url: "/users" });
+    for (const user of listed.json()) expect(user).not.toHaveProperty("passwordHash");
+  });
+
   test("quem não tem USERS_WRITE não cria usuário", async () => {
     const reader = await createActor(app, [Permission.USERS_READ]);
 
