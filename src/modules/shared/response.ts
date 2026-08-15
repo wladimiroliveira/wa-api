@@ -19,8 +19,8 @@ export const errorSchema = z.object({
   error: z.string().optional(),
 });
 
-/** 204 não tem corpo; a declaração existe para o OpenAPI descrever o status. */
-export const noContentSchema = z.null();
+/** 204 não tem corpo; z.void() (não z.null()) porque o type provider tipa reply.send() como aceitando 0 argumentos só quando o schema é void. */
+export const noContentSchema = z.void();
 
 /** Espalhado nas rotas que exigem permissão. */
 export const protectedErrors = { 401: errorSchema, 403: errorSchema } as const;

@@ -44,9 +44,9 @@ describe("supplies routes (integração)", () => {
       name: "Açúcar (crud)",
       type: "INGREDIENT",
       purchaseUnit: "KG",
-      purchaseQty: "2",
-      purchasePrice: "15.5",
-      currentStock: "0",
+      purchaseQty: 2,
+      purchasePrice: 15.5,
+      currentStock: 0,
     });
   });
 
@@ -96,7 +96,7 @@ describe("supplies routes (integração)", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ name: "Leite (crud)", purchaseQty: "2", purchasePrice: "9.9" });
+    expect(res.json()).toMatchObject({ name: "Leite (crud)", purchaseQty: 2, purchasePrice: 9.9 });
   });
 
   test("edição de insumo inexistente → 404", async () => {
