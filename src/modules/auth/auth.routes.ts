@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { fastifyRateLimit } from "@fastify/rate-limit";
-import { createSessionSchema, refreshSessionSchema } from "./auth.schema.js";
+import { createSessionSchema, meResponseSchema, refreshSessionSchema, sessionResponseSchema } from "./auth.schema.js";
 import { loadAuthConfig } from "./auth.config.js";
 import { requireAuth } from "./auth.guard.js";
 import {
@@ -12,6 +12,7 @@ import {
   InvalidCredentialsError,
   InvalidRefreshTokenError,
 } from "./auth.service.js";
+import { errorSchema, noContentSchema } from "../shared/response.js";
 
 export default async function authRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -25,7 +26,11 @@ export default async function authRoutes(app: FastifyInstance) {
     "/sessions",
     {
       config: { public: true, rateLimit: { max: loginRateLimitMax, timeWindow: "15 minutes" } },
-      schema: { body: createSessionSchema, security: [] },
+      schema: {
+        body: createSessionSchema,
+        security: [],
+        response: { 200: sessionResponseSchema, 400: errorSchema, 401: errorSchema, 429: errorSchema },
+      },
     },
     async (req, reply) => {
       try {
@@ -41,7 +46,14 @@ export default async function authRoutes(app: FastifyInstance) {
 
   r.post(
     "/sessions/refresh",
-    { config: { public: true }, schema: { body: refreshSessionSchema, security: [] } },
+    {
+      config: { public: true },
+      schema: {
+        body: refreshSessionSchema,
+        security: [],
+        response: { 200: sessionResponseSchema, 400: errorSchema, 401: errorSchema },
+      },
+    },
     async (req, reply) => {
       try {
         const rotated = await rotateRefreshToken(req.body.refreshToken);
@@ -54,14 +66,25 @@ export default async function authRoutes(app: FastifyInstance) {
     },
   );
 
-  r.delete("/sessions", { preHandler: requireAuth(), schema: { body: refreshSessionSchema } }, async (req, reply) => {
-    await revokeRefreshToken(req.body.refreshToken, req.auth.user.id);
+  r.delete(
+    "/sessions",
+    {
+      preHandler: requireAuth(),
+      schema: { body: refreshSessionSchema, response: { 204: noContentSchema, 400: errorSchema, 401: errorSchema } },
+    },
+    async (req, reply) => {
+      await revokeRefreshToken(req.body.refreshToken, req.auth.user.id);
 
-    return reply.status(204).send();
-  });
+      return reply.status(204).send();
+    },
+  );
 
-  r.get("/me", { preHandler: requireAuth() }, async (req) => ({
-    ...req.auth.user,
-    permissions: [...req.auth.permissions],
-  }));
+  r.get(
+    "/me",
+    { preHandler: requireAuth(), schema: { response: { 200: meResponseSchema, 401: errorSchema } } },
+    async (req) => ({
+      ...req.auth.user,
+      permissions: [...req.auth.permissions],
+    }),
+  );
 }

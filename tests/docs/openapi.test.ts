@@ -194,3 +194,37 @@ describe("openapi: roles", () => {
     expect(responseSchemaOf(app, "delete", "/roles/{id}", 204)).toBeDefined();
   });
 });
+
+describe("openapi: auth", () => {
+  test("POST /sessions documenta o par de tokens", () => {
+    expect(responseSchemaOf(app, "post", "/sessions", 200)).toMatchObject({
+      type: "object",
+      properties: { accessToken: { type: "string" }, refreshToken: { type: "string" } },
+    });
+  });
+
+  test("POST /sessions documenta 401 e o 429 do rate limit", () => {
+    expect(responseSchemaOf(app, "post", "/sessions", 401)).toBeDefined();
+    expect(responseSchemaOf(app, "post", "/sessions", 429)).toBeDefined();
+  });
+
+  test("GET /me documenta o usuário e as permissões efetivas", () => {
+    expect(responseSchemaOf(app, "get", "/me", 200)).toMatchObject({
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        username: { type: "string" },
+        permissions: { type: "array" },
+      },
+    });
+  });
+
+  test("GET /me não documenta passwordHash", () => {
+    const schema = responseSchemaOf(app, "get", "/me", 200) as { properties: object };
+    expect(schema.properties).not.toHaveProperty("passwordHash");
+  });
+
+  test("DELETE /sessions documenta o 204", () => {
+    expect(responseSchemaOf(app, "delete", "/sessions", 204)).toBeDefined();
+  });
+});
