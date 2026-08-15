@@ -165,3 +165,14 @@ describe("openapi: production", () => {
     });
   });
 });
+
+describe("openapi: health", () => {
+  test("GET /health documenta 200 e 503 com os mesmos campos", () => {
+    for (const status of [200, 503]) {
+      expect(responseSchemaOf(app, "get", "/health", status)).toMatchObject({
+        type: "object",
+        properties: { status: { enum: ["ok", "error"] }, database: { enum: ["up", "down"] } },
+      });
+    }
+  });
+});
