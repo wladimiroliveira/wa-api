@@ -7,6 +7,8 @@ import wasteRoutes from "./modules/waste/waste.routes.js";
 import productionRoutes from "./modules/production/production.routes.js";
 import healthRoutes from "./modules/health/health.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
+import roleRoutes from "./modules/users/roles.routes.js";
+import userRoutes from "./modules/users/users.routes.js";
 
 export default async function (app: FastifyInstance) {
   await app.register(healthRoutes);
@@ -17,4 +19,6 @@ export default async function (app: FastifyInstance) {
   await app.register(stockRoutes);
   await app.register(wasteRoutes);
   await app.register(productionRoutes);
+  await app.register(roleRoutes);
+  await app.register(userRoutes);
 }

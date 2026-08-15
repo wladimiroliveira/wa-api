@@ -59,4 +59,9 @@ export default async function authRoutes(app: FastifyInstance) {
 
     return reply.status(204).send();
   });
+
+  r.get("/me", { preHandler: requireAuth() }, async (req) => ({
+    ...req.auth.user,
+    permissions: [...req.auth.permissions],
+  }));
 }
