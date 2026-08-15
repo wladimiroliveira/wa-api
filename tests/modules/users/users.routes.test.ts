@@ -33,6 +33,7 @@ describe("users routes (integração)", () => {
   test("cria usuário com 201 e nunca devolve o hash da senha", async () => {
     const res = await createUser({
       name: "Novo",
+      username: `novo-${crypto.randomUUID().slice(0, 8)}`,
       email: `novo-${crypto.randomUUID()}@example.test`,
       password: "senha-inicial",
       grantedPermissions: [Permission.STOCK_READ],
@@ -46,6 +47,7 @@ describe("users routes (integração)", () => {
   test("a senha é guardada hasheada", async () => {
     const created = await createUser({
       name: "Hash",
+      username: `hash-${crypto.randomUUID().slice(0, 8)}`,
       email: `hash-${crypto.randomUUID()}@example.test`,
       password: "senha-inicial",
     });
@@ -58,9 +60,60 @@ describe("users routes (integração)", () => {
 
   test("email duplicado → 409", async () => {
     const email = `dup-${crypto.randomUUID()}@example.test`;
-    await createUser({ name: "A", email, password: "senha-inicial" });
+    await createUser({ name: "A", username: `a-${crypto.randomUUID().slice(0, 8)}`, email, password: "senha-inicial" });
 
-    expect((await createUser({ name: "B", email, password: "senha-inicial" })).statusCode).toBe(409);
+    expect(
+      (
+        await createUser({
+          name: "B",
+          username: `b-${crypto.randomUUID().slice(0, 8)}`,
+          email,
+          password: "senha-inicial",
+        })
+      ).statusCode,
+    ).toBe(409);
+  });
+
+  test("username duplicado → 409, mesmo com caixa diferente", async () => {
+    const username = `dup-${crypto.randomUUID().slice(0, 8)}`;
+    await createUser({
+      name: "A",
+      username,
+      email: `a-${crypto.randomUUID()}@example.test`,
+      password: "senha-inicial",
+    });
+
+    const res = await createUser({
+      name: "B",
+      username: username.toUpperCase(),
+      email: `b-${crypto.randomUUID()}@example.test`,
+      password: "senha-inicial",
+    });
+
+    expect(res.statusCode).toBe(409);
+  });
+
+  test("recusa username com caractere inválido", async () => {
+    const res = await createUser({
+      name: "Inválido",
+      username: "maria souza",
+      email: `invalido-${crypto.randomUUID()}@example.test`,
+      password: "senha-inicial",
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  test("grava o username normalizado em minúsculas", async () => {
+    const username = `Maiuscula-${crypto.randomUUID().slice(0, 8)}`;
+    const created = await createUser({
+      name: "Caixa",
+      username,
+      email: `caixa-${crypto.randomUUID()}@example.test`,
+      password: "senha-inicial",
+    });
+
+    expect(created.json().username).toBe(username.toLowerCase());
   });
 
   test("a lista não vaza hash de senha", async () => {
@@ -81,6 +134,7 @@ describe("users routes (integração)", () => {
 
     const created = await createUser({
       name: "Efetivo",
+      username: `efetivo-${crypto.randomUUID().slice(0, 8)}`,
       email: `efetivo-${crypto.randomUUID()}@example.test`,
       password: "senha-inicial",
       roleId: role.id,
@@ -101,6 +155,7 @@ describe("users routes (integração)", () => {
   test("desativar revoga os refresh tokens do usuário", async () => {
     const created = await createUser({
       name: "Desligado",
+      username: `desligado-${crypto.randomUUID().slice(0, 8)}`,
       email: `desligado-${crypto.randomUUID()}@example.test`,
       password: "senha-inicial",
     });
@@ -137,7 +192,12 @@ describe("users routes (integração)", () => {
       method: "POST",
       url: "/users",
       headers: reader.headers,
-      payload: { name: "Negado", email: `negado-${crypto.randomUUID()}@example.test`, password: "senha-inicial" },
+      payload: {
+        name: "Negado",
+        username: `negado-${crypto.randomUUID().slice(0, 8)}`,
+        email: `negado-${crypto.randomUUID()}@example.test`,
+        password: "senha-inicial",
+      },
     });
 
     expect(res.statusCode).toBe(403);

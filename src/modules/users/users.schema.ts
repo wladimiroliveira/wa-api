@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { permissionSchema } from "./roles.schema.js";
+import { usernameSchema } from "../shared/username.js";
 
 export const createUserSchema = z.object({
   name: z.string().min(1),
+  username: usernameSchema,
   email: z.string().email(),
   password: z.string().min(8),
   roleId: z.string().uuid().nullable().optional(),
@@ -12,6 +14,8 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = z.object({
   name: z.string().min(1).optional(),
+  // Editável: sem DELETE /users/:id, um username errado seria impossível de consertar.
+  username: usernameSchema.optional(),
   roleId: z.string().uuid().nullable().optional(),
   grantedPermissions: z.array(permissionSchema).optional(),
   deniedPermissions: z.array(permissionSchema).optional(),

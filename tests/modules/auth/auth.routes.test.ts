@@ -10,18 +10,19 @@ const PASSWORD = "senha-de-teste";
 describe("session routes (integração)", () => {
   let app: FastifyInstance;
   const createdUserIds: string[] = [];
-  let email: string;
+  let username: string;
   let userId: string;
 
   beforeAll(async () => {
     app = await buildApp();
     await app.ready();
 
-    email = `session-${crypto.randomUUID()}@example.test`;
+    username = `session-${crypto.randomUUID().slice(0, 8)}`;
     const user = await prisma.user.create({
       data: {
         name: "Session User",
-        email,
+        username,
+        email: `${username}@example.test`,
         passwordHash: await hashPassword(PASSWORD),
         grantedPermissions: [Permission.SUPPLIES_READ],
       },
@@ -36,7 +37,7 @@ describe("session routes (integração)", () => {
   });
 
   async function login() {
-    return app.inject({ method: "POST", url: "/sessions", payload: { email, password: PASSWORD } });
+    return app.inject({ method: "POST", url: "/sessions", payload: { username, password: PASSWORD } });
   }
 
   test("login devolve access e refresh token", async () => {
@@ -47,8 +48,19 @@ describe("session routes (integração)", () => {
     expect(res.json().refreshToken).toEqual(expect.any(String));
   });
 
+  test("login não depende da caixa do username", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/sessions",
+      payload: { username: username.toUpperCase(), password: PASSWORD },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().accessToken).toEqual(expect.any(String));
+  });
+
   test("login com senha errada → 401", async () => {
-    const res = await app.inject({ method: "POST", url: "/sessions", payload: { email, password: "errada" } });
+    const res = await app.inject({ method: "POST", url: "/sessions", payload: { username, password: "errada" } });
 
     expect(res.statusCode).toBe(401);
   });

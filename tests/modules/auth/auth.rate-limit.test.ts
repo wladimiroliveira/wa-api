@@ -23,7 +23,7 @@ describe("limite de tentativas no login", () => {
         method: "POST",
         url: "/sessions",
         remoteAddress: "203.0.113.7",
-        payload: { email: "forca-bruta@example.test", password: "chute" },
+        payload: { username: "forca-bruta", password: "chute" },
       });
 
     const statuses: number[] = [];

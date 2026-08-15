@@ -6,20 +6,21 @@ import { verifyPassword } from "../../src/modules/auth/auth.password.js";
 import { Permission } from "../../src/generated/prisma/index.js";
 
 const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
-const OWNER_EMAIL = `owner-seed-${crypto.randomUUID()}@example.test`;
+const OWNER_USERNAME = `owner-seed-${crypto.randomUUID().slice(0, 8)}`;
+const OWNER_EMAIL = `${OWNER_USERNAME}@example.test`;
 const OWNER_PASSWORD = "senha-do-dono";
 
 function runSeed() {
   execFileSync("npm", ["run", "db:seed"], {
     cwd: projectRoot,
     stdio: "pipe",
-    env: { ...process.env, OWNER_EMAIL, OWNER_PASSWORD },
+    env: { ...process.env, OWNER_USERNAME, OWNER_EMAIL, OWNER_PASSWORD },
   });
 }
 
 describe("db:seed", () => {
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { email: OWNER_EMAIL } });
+    await prisma.user.deleteMany({ where: { username: OWNER_USERNAME } });
     await prisma.role.deleteMany({ where: { name: "Owner", users: { none: {} } } });
     await prisma.$disconnect();
   });
@@ -29,7 +30,7 @@ describe("db:seed", () => {
 
     const [role, user] = await Promise.all([
       prisma.role.findUnique({ where: { name: "Owner" } }),
-      prisma.user.findUnique({ where: { email: OWNER_EMAIL } }),
+      prisma.user.findUnique({ where: { username: OWNER_USERNAME } }),
     ]);
 
     expect(role?.permissions.sort()).toEqual(Object.values(Permission).sort());
@@ -40,7 +41,7 @@ describe("db:seed", () => {
   test("rodar de novo não duplica nem quebra", async () => {
     runSeed();
 
-    expect(await prisma.user.count({ where: { email: OWNER_EMAIL } })).toBe(1);
+    expect(await prisma.user.count({ where: { username: OWNER_USERNAME } })).toBe(1);
     expect(await prisma.role.count({ where: { name: "Owner" } })).toBe(1);
   }, 120_000);
 });

@@ -29,7 +29,7 @@ export default async function authRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       try {
-        const user = await authenticate(req.body.email, req.body.password);
+        const user = await authenticate(req.body.username, req.body.password);
 
         return { accessToken: signAccessToken(user.id), refreshToken: await issueRefreshToken(user.id) };
       } catch (err) {

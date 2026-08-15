@@ -5,7 +5,7 @@ import * as repo from "./auth.repository.js";
 
 export class InvalidCredentialsError extends Error {
   constructor() {
-    super("Email ou senha inválidos");
+    super("Usuário ou senha inválidos");
   }
 }
 
@@ -18,8 +18,9 @@ export class InvalidRefreshTokenError extends Error {
 /** Hash descartável: mantém o custo do login parecido quando o email não existe. */
 const decoyHash = await hashPassword(generateRefreshToken());
 
-export async function authenticate(email: string, password: string): Promise<{ id: string }> {
-  const user = await repo.findUserForAuthentication(email);
+/** O username chega já normalizado pelo `usernameSchema` na borda da rota. */
+export async function authenticate(username: string, password: string): Promise<{ id: string }> {
+  const user = await repo.findUserForAuthentication(username);
 
   if (!user || !user.isActive) {
     await verifyPassword(password, decoyHash);

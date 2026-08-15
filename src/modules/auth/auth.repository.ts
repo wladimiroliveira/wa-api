@@ -1,7 +1,7 @@
 import prisma from "../../lib/prisma.js";
 
-export function findUserForAuthentication(email: string) {
-  return prisma.user.findUnique({ where: { email } });
+export function findUserForAuthentication(username: string) {
+  return prisma.user.findUnique({ where: { username } });
 }
 
 export function findActiveUserWithRole(id: string) {
