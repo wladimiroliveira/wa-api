@@ -120,6 +120,7 @@ and database name while its data volume is empty — changing them later renames
 | `npm run db:migrate`          | Applies migrations in development                            |
 | `npm run db:generate`         | Regenerates the Prisma client                                |
 | `npm run db:seed`             | Creates the Owner role and the first user                    |
+| `npm run openapi:export`      | Rewrites the versioned `openapi.json`                        |
 | `npm run lint:prettier:check` | Checks formatting                                            |
 | `npm run lint:prettier:fix`   | Fixes formatting                                             |
 | `npm run commit`              | Commitizen prompt for conventional commits                   |
@@ -223,6 +224,11 @@ permission — or, on the session routes, a cookie request without a matching `X
 Every route declares a response schema, so `/docs` carries the full contract of each body — including the error shapes
 per status. The schema is enforced at serialization: a field that is not declared never reaches the client.
 
+The same document is versioned at `openapi.json`, so a consumer can generate its client without running this service.
+`npm run openapi:export` rewrites it — no database and no configured environment needed — and the CI fails when the
+committed file drifts from what the application serves. Changing the shape of a response therefore shows up in the
+pull request as a diff of the public contract, not only as an edit to a `.schema.ts`.
+
 | Method   | Endpoint                      | Permission         | Description                                                     |
 | -------- | ----------------------------- | ------------------ | --------------------------------------------------------------- |
 | `GET`    | `/health`                     | public             | Liveness plus a database ping; `503` when the DB is down        |
@@ -319,8 +325,10 @@ src/
     health/              # liveness and database ping
     shared/              # units, dimensions, money and credential helpers
 prisma/                  # schema and migrations
+scripts/                 # maintenance scripts that are not shipped
 tests/                   # unit and integration tests
 docs/                    # design documents and implementation plans
+openapi.json             # the API contract, exported from the running document
 ```
 
 Each module follows the same layout: `*.schema.ts` (Zod contracts), `*.routes.ts` (HTTP), `*.repository.ts`
