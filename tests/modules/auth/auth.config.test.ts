@@ -13,6 +13,7 @@ describe("loadAuthConfig", () => {
     expect(config.accessTokenTtl).toBe("15m");
     expect(config.refreshTokenTtlDays).toBe(30);
     expect(config.loginRateLimitMax).toBe(5);
+    expect(config.refreshRateLimitMax).toBe(60);
   });
 
   test("quebra a lista de origens do CORS por vírgula, ignorando espaços", () => {
@@ -33,16 +34,18 @@ describe("loadAuthConfig", () => {
     expect(() => loadAuthConfig({ JWT_SECRET: "a".repeat(32) })).toThrow(/CORS_ORIGINS/);
   });
 
-  test("aceita sobrescrita da vida útil e do limite de login", () => {
+  test("aceita sobrescrita da vida útil e dos limites de tentativa", () => {
     const config = loadAuthConfig({
       ...validEnv,
       ACCESS_TOKEN_TTL: "5m",
       REFRESH_TOKEN_TTL_DAYS: "7",
       LOGIN_RATE_LIMIT_MAX: "1000",
+      REFRESH_RATE_LIMIT_MAX: "900",
     });
 
     expect(config.accessTokenTtl).toBe("5m");
     expect(config.refreshTokenTtlDays).toBe(7);
     expect(config.loginRateLimitMax).toBe(1000);
+    expect(config.refreshRateLimitMax).toBe(900);
   });
 });

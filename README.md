@@ -93,6 +93,7 @@ stops answering.
 | `ACCESS_TOKEN_TTL`       | Access token lifetime, defaults to `15m`              | `15m`                                                    |
 | `REFRESH_TOKEN_TTL_DAYS` | Refresh token lifetime in days, defaults to `30`      | `30`                                                     |
 | `LOGIN_RATE_LIMIT_MAX`   | Login attempts per address per 15 min, defaults to 5  | `5`                                                      |
+| `REFRESH_RATE_LIMIT_MAX` | Refresh calls per address per 15 min, defaults to 60  | `60`                                                     |
 | `OWNER_USERNAME`         | First user's login credential, read only by `db:seed` | `owner`                                                  |
 | `OWNER_EMAIL`            | First user's email, read only by `db:seed`            | `owner@example.com`                                      |
 | `OWNER_PASSWORD`         | First user's password, read only by `db:seed`         | `change-this-password`                                   |
@@ -138,28 +139,66 @@ A user's effective permission is `(role ∪ grantedPermissions) − deniedPermis
 from the database on every request, so a permission change takes effect on the next call, and it is inspectable through
 `GET /users/:id/permissions`.
 
+### Where the refresh token goes
+
+The access token always comes back in the body: it lives 15 minutes, belongs in memory, and is not the asset worth
+stealing. The refresh token lives 30 days, so where it lands decides how bad an XSS gets. The API delivers it two ways
+and the client picks at login.
+
+**Cookie — the default, for browsers.** `POST /sessions` with no extra header answers `{ accessToken }` and sets the
+refresh token as `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/sessions`. JavaScript cannot read it, so an XSS cannot
+walk off with a 30-day credential. A second cookie, `csrfToken`, is deliberately readable: the client echoes it in the
+`X-CSRF-Token` header on refresh and logout, and the API compares the two.
+
+**Body — opt-in, for native clients.** `POST /sessions` with `X-Refresh-Delivery: body` answers
+`{ accessToken, refreshToken }` and sets no cookies. Mobile apps have no XSS surface and no cookie jar worth the
+trouble, so they hold the string themselves.
+
+The delivery never converts. A request that arrives with the cookie is answered with a cookie, even if it asks for the
+body — otherwise an XSS would trade the unreachable cookie for a readable string, and `HttpOnly` would be decoration.
+CORS runs with `credentials: true`, which is only safe because `CORS_ORIGINS` is an explicit list and never a wildcard.
+
 ```bash
-# 1. log in
-curl -X POST http://localhost:3333/sessions \
+# --- browser flow (cookie) ---
+# 1. log in; the refresh token lands in a cookie jar
+curl -X POST http://localhost:3333/sessions -c jar.txt \
   -H "Content-Type: application/json" \
   -d '{"username":"owner","password":"change-this-password"}'
-# → { "accessToken": "...", "refreshToken": "..." }
+# → { "accessToken": "..." }
 
 # 2. call a protected route
 curl http://localhost:3333/supplies -H "Authorization: Bearer <accessToken>"
 
-# 3. rotate the pair when the access token expires
+# 3. rotate; no body, cookie plus the anti-CSRF header
+curl -X POST http://localhost:3333/sessions/refresh -b jar.txt -c jar.txt \
+  -H "X-CSRF-Token: <csrfToken cookie value>"
+
+# --- native flow (body) ---
+curl -X POST http://localhost:3333/sessions \
+  -H "Content-Type: application/json" -H "X-Refresh-Delivery: body" \
+  -d '{"username":"owner","password":"change-this-password"}'
+# → { "accessToken": "...", "refreshToken": "..." }
+
 curl -X POST http://localhost:3333/sessions/refresh \
   -H "Content-Type: application/json" -d '{"refreshToken":"<refreshToken>"}'
 ```
 
-The access token lives 15 minutes and carries only the user id. The refresh token lives 30 days, is stored hashed, and
-rotates on every use — replaying an already rotated token revokes the whole session, since that signals theft. Users are
-deactivated rather than deleted, which preserves the production and waste history they recorded and revokes their
-refresh tokens.
+**The browser client must share an origin with the API.** Serve the front end and the API from one origin — through the
+dev server's proxy locally, and through a reverse proxy or a shared host in production. The reason is the `csrfToken`
+cookie: it is set host-only for the API's host, so a front end on a different host cannot read it, and without reading
+it there is no header to send back. `Secure` is not a problem on `http://localhost`, which browsers already treat as a
+secure context. Native clients are unaffected — they use the body flow, which has no cookie and no CSRF check.
+
+`POST /sessions/refresh` carries its own rate limit, separate from the login one, because the browser calls it on its
+own — on every page load and whenever the access token expires — and must not spend the budget of someone typing a
+password. Both are per address and per 15 minutes; see `LOGIN_RATE_LIMIT_MAX` and `REFRESH_RATE_LIMIT_MAX`.
+
+The refresh token is stored hashed and rotates on every use — replaying an already rotated token revokes the whole
+session, since that signals theft. Users are deactivated rather than deleted, which preserves the production and waste
+history they recorded and revokes their refresh tokens.
 
 `401` means no token, or an invalid, expired or deactivated one. `403` means authenticated but missing the required
-permission.
+permission — or, on the session routes, a cookie request without a matching `X-CSRF-Token`.
 
 **Adding a route.** Every route must declare `requirePermission(Permission.X)`, `requireAuth()` or
 `config: { public: true }`. The server refuses to start otherwise, so a new route cannot be born open by accident.
@@ -169,41 +208,41 @@ permission.
 Every route declares a response schema, so `/docs` carries the full contract of each body — including the error shapes
 per status. The schema is enforced at serialization: a field that is not declared never reaches the client.
 
-| Method   | Endpoint                      | Permission         | Description                                               |
-| -------- | ----------------------------- | ------------------ | --------------------------------------------------------- |
-| `GET`    | `/health`                     | public             | Liveness plus a database ping; `503` when the DB is down  |
-| `POST`   | `/sessions`                   | public             | Logs in and returns the access and refresh tokens         |
-| `POST`   | `/sessions/refresh`           | public             | Rotates the token pair                                    |
-| `DELETE` | `/sessions`                   | authenticated      | Logs out by revoking the refresh token                    |
-| `GET`    | `/me`                         | authenticated      | Current user and effective permissions                    |
-| `GET`    | `/supplies`                   | `SUPPLIES_READ`    | Lists supplies                                            |
-| `POST`   | `/supplies`                   | `SUPPLIES_WRITE`   | Creates a supply                                          |
-| `GET`    | `/supplies/:id`               | `SUPPLIES_READ`    | Gets a supply                                             |
-| `PATCH`  | `/supplies/:id`               | `SUPPLIES_WRITE`   | Updates a supply                                          |
-| `DELETE` | `/supplies/:id`               | `SUPPLIES_WRITE`   | Deletes a supply                                          |
-| `GET`    | `/recipes`                    | `RECIPES_READ`     | Lists recipes                                             |
-| `POST`   | `/recipes`                    | `RECIPES_WRITE`    | Creates a recipe with its items                           |
-| `GET`    | `/recipes/:id`                | `RECIPES_READ`     | Gets a recipe with its items                              |
-| `PATCH`  | `/recipes/:id`                | `RECIPES_WRITE`    | Updates a recipe                                          |
-| `PATCH`  | `/recipes/:id/margin`         | `RECIPES_WRITE`    | Updates only the margin                                   |
-| `DELETE` | `/recipes/:id`                | `RECIPES_WRITE`    | Deletes a recipe                                          |
-| `GET`    | `/recipes/:id/pricing`        | `PRICING_READ`     | Returns cost per hundred and suggested prices             |
-| `POST`   | `/supplies/:id/stock-entries` | `STOCK_WRITE`      | Registers a stock entry                                   |
-| `GET`    | `/supplies/:id/movements`     | `STOCK_READ`       | Lists the ledger movements of a supply                    |
-| `POST`   | `/supplies/:id/wastes`        | `WASTE_WRITE`      | Registers waste for a supply                              |
-| `GET`    | `/wastes`                     | `WASTE_READ`       | Lists waste records                                       |
-| `POST`   | `/productions`                | `PRODUCTION_WRITE` | Registers a production and consumes the recipe's supplies |
-| `GET`    | `/productions`                | `PRODUCTION_READ`  | Lists productions                                         |
-| `GET`    | `/productions/:id`            | `PRODUCTION_READ`  | Gets a production                                         |
-| `GET`    | `/users`                      | `USERS_READ`       | Lists users                                               |
-| `POST`   | `/users`                      | `USERS_WRITE`      | Creates a user                                            |
-| `GET`    | `/users/:id`                  | `USERS_READ`       | Gets a user                                               |
-| `PATCH`  | `/users/:id`                  | `USERS_WRITE`      | Edits role, exceptions and `isActive`                     |
-| `GET`    | `/users/:id/permissions`      | `USERS_READ`       | Effective permission, already computed                    |
-| `GET`    | `/roles`                      | `USERS_READ`       | Lists roles                                               |
-| `POST`   | `/roles`                      | `USERS_WRITE`      | Creates a role                                            |
-| `PATCH`  | `/roles/:id`                  | `USERS_WRITE`      | Edits the permission bundle                               |
-| `DELETE` | `/roles/:id`                  | `USERS_WRITE`      | Removes a role; its users lose the inheritance            |
+| Method   | Endpoint                      | Permission         | Description                                                     |
+| -------- | ----------------------------- | ------------------ | --------------------------------------------------------------- |
+| `GET`    | `/health`                     | public             | Liveness plus a database ping; `503` when the DB is down        |
+| `POST`   | `/sessions`                   | public             | Logs in; refresh token in a cookie, or in the body on opt-in    |
+| `POST`   | `/sessions/refresh`           | public             | Rotates the token pair, by cookie or by body                    |
+| `DELETE` | `/sessions`                   | authenticated      | Logs out by revoking the refresh token and clearing the cookies |
+| `GET`    | `/me`                         | authenticated      | Current user and effective permissions                          |
+| `GET`    | `/supplies`                   | `SUPPLIES_READ`    | Lists supplies                                                  |
+| `POST`   | `/supplies`                   | `SUPPLIES_WRITE`   | Creates a supply                                                |
+| `GET`    | `/supplies/:id`               | `SUPPLIES_READ`    | Gets a supply                                                   |
+| `PATCH`  | `/supplies/:id`               | `SUPPLIES_WRITE`   | Updates a supply                                                |
+| `DELETE` | `/supplies/:id`               | `SUPPLIES_WRITE`   | Deletes a supply                                                |
+| `GET`    | `/recipes`                    | `RECIPES_READ`     | Lists recipes                                                   |
+| `POST`   | `/recipes`                    | `RECIPES_WRITE`    | Creates a recipe with its items                                 |
+| `GET`    | `/recipes/:id`                | `RECIPES_READ`     | Gets a recipe with its items                                    |
+| `PATCH`  | `/recipes/:id`                | `RECIPES_WRITE`    | Updates a recipe                                                |
+| `PATCH`  | `/recipes/:id/margin`         | `RECIPES_WRITE`    | Updates only the margin                                         |
+| `DELETE` | `/recipes/:id`                | `RECIPES_WRITE`    | Deletes a recipe                                                |
+| `GET`    | `/recipes/:id/pricing`        | `PRICING_READ`     | Returns cost per hundred and suggested prices                   |
+| `POST`   | `/supplies/:id/stock-entries` | `STOCK_WRITE`      | Registers a stock entry                                         |
+| `GET`    | `/supplies/:id/movements`     | `STOCK_READ`       | Lists the ledger movements of a supply                          |
+| `POST`   | `/supplies/:id/wastes`        | `WASTE_WRITE`      | Registers waste for a supply                                    |
+| `GET`    | `/wastes`                     | `WASTE_READ`       | Lists waste records                                             |
+| `POST`   | `/productions`                | `PRODUCTION_WRITE` | Registers a production and consumes the recipe's supplies       |
+| `GET`    | `/productions`                | `PRODUCTION_READ`  | Lists productions                                               |
+| `GET`    | `/productions/:id`            | `PRODUCTION_READ`  | Gets a production                                               |
+| `GET`    | `/users`                      | `USERS_READ`       | Lists users                                                     |
+| `POST`   | `/users`                      | `USERS_WRITE`      | Creates a user                                                  |
+| `GET`    | `/users/:id`                  | `USERS_READ`       | Gets a user                                                     |
+| `PATCH`  | `/users/:id`                  | `USERS_WRITE`      | Edits role, exceptions and `isActive`                           |
+| `GET`    | `/users/:id/permissions`      | `USERS_READ`       | Effective permission, already computed                          |
+| `GET`    | `/roles`                      | `USERS_READ`       | Lists roles                                                     |
+| `POST`   | `/roles`                      | `USERS_WRITE`      | Creates a role                                                  |
+| `PATCH`  | `/roles/:id`                  | `USERS_WRITE`      | Edits the permission bundle                                     |
+| `DELETE` | `/roles/:id`                  | `USERS_WRITE`      | Removes a role; its users lose the inheritance                  |
 
 ## Domain rules
 

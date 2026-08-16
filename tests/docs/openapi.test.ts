@@ -241,6 +241,21 @@ describe("openapi: auth", () => {
     });
   });
 
+  test("POST /sessions documenta o refreshToken como opcional, porque no modo cookie ele não vem", () => {
+    const schema = responseSchemaOf(app, "post", "/sessions", 200) as { required?: string[] };
+
+    expect(schema.required).toEqual(["accessToken"]);
+  });
+
+  test("POST /sessions/refresh e DELETE /sessions documentam o 403 do anti-CSRF", () => {
+    expect(responseSchemaOf(app, "post", "/sessions/refresh", 403)).toBeDefined();
+    expect(responseSchemaOf(app, "delete", "/sessions", 403)).toBeDefined();
+  });
+
+  test("POST /sessions/refresh documenta o 429 do seu próprio rate limit", () => {
+    expect(responseSchemaOf(app, "post", "/sessions/refresh", 429)).toBeDefined();
+  });
+
   test("POST /sessions documenta 401 e o 429 do rate limit", () => {
     expect(responseSchemaOf(app, "post", "/sessions", 401)).toBeDefined();
     expect(responseSchemaOf(app, "post", "/sessions", 429)).toBeDefined();

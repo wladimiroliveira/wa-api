@@ -36,8 +36,14 @@ describe("session routes (integração)", () => {
     await app.close();
   });
 
+  /** Modo corpo: o caminho dos clientes não-navegador, que é o coberto aqui. */
   async function login() {
-    return app.inject({ method: "POST", url: "/sessions", payload: { username, password: PASSWORD } });
+    return app.inject({
+      method: "POST",
+      url: "/sessions",
+      headers: { "x-refresh-delivery": "body" },
+      payload: { username, password: PASSWORD },
+    });
   }
 
   test("login devolve access e refresh token", async () => {
