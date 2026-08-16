@@ -201,6 +201,14 @@ describe("openapi: production", () => {
     });
   });
 
+  test("GET /productions documenta a receita aninhada em cada item da página", () => {
+    expect(responseSchemaOf(app, "get", "/productions", 200)).toMatchObject({
+      properties: {
+        data: { type: "array", items: { properties: { recipe: { properties: { name: { type: "string" } } } } } },
+      },
+    });
+  });
+
   test("GET /productions documenta paginação e recorte por período", () => {
     expect(queryParamsOf(app, "get", "/productions").sort()).toEqual(["cursor", "from", "limit", "to"]);
   });
@@ -209,6 +217,27 @@ describe("openapi: production", () => {
     expect(responseSchemaOf(app, "get", "/productions/{id}", 200)).toMatchObject({
       properties: { movements: { type: "array", items: { properties: { quantityBase: { type: "number" } } } } },
     });
+  });
+
+  test("GET /productions/{id} documenta o insumo aninhado em cada movimento", () => {
+    expect(responseSchemaOf(app, "get", "/productions/{id}", 200)).toMatchObject({
+      properties: {
+        movements: { type: "array", items: { properties: { supply: { properties: { name: { type: "string" } } } } } },
+      },
+    });
+  });
+
+  test("GET /productions/{id} documenta a receita aninhada", () => {
+    expect(responseSchemaOf(app, "get", "/productions/{id}", 200)).toMatchObject({
+      properties: { recipe: { properties: { name: { type: "string" } } } },
+    });
+  });
+
+  test("POST /productions documenta a produção sem a receita aninhada", () => {
+    const schema = responseSchemaOf(app, "post", "/productions", 201) as {
+      properties: { production: { properties: object } };
+    };
+    expect(schema.properties.production.properties).not.toHaveProperty("recipe");
   });
 });
 

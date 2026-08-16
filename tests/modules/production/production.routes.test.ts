@@ -110,6 +110,21 @@ describe("production routes (integração)", () => {
     expect(body.data.some((p: { id: string }) => p.id === createdId)).toBe(true);
   });
 
+  test("GET /productions traz a receita aninhada em cada item", async () => {
+    const created = await app.inject({
+      headers: actor.headers,
+      method: "POST",
+      url: "/productions",
+      payload: { recipeId, producedQty: 100 },
+    });
+    const createdId = created.json().production.id;
+
+    const res = await app.inject({ headers: actor.headers, method: "GET", url: "/productions" });
+    expect(res.statusCode).toBe(200);
+    const mine = res.json().data.find((p: { id: string }) => p.id === createdId);
+    expect(mine.recipe).toMatchObject({ id: recipeId, name: "Brigadeiro (producao)" });
+  });
+
   test("GET /productions/:id retorna a produção com movements e producedUnits", async () => {
     const created = await app.inject({
       headers: actor.headers,
@@ -124,6 +139,35 @@ describe("production routes (integração)", () => {
     const body = res.json();
     expect(Array.isArray(body.movements)).toBe(true);
     expect(body.producedUnits).toBe(100);
+  });
+
+  test("GET /productions/:id traz o insumo aninhado em cada movimento", async () => {
+    const created = await app.inject({
+      headers: actor.headers,
+      method: "POST",
+      url: "/productions",
+      payload: { recipeId, producedQty: 100 },
+    });
+    const createdId = created.json().production.id;
+
+    const res = await app.inject({ headers: actor.headers, method: "GET", url: `/productions/${createdId}` });
+    expect(res.statusCode).toBe(200);
+    const movement = res.json().movements.find((m: { supplyId: string }) => m.supplyId === supplyId);
+    expect(movement.supply).toMatchObject({ id: supplyId, name: "Massa (producao)" });
+  });
+
+  test("GET /productions/:id traz a receita aninhada", async () => {
+    const created = await app.inject({
+      headers: actor.headers,
+      method: "POST",
+      url: "/productions",
+      payload: { recipeId, producedQty: 100 },
+    });
+    const createdId = created.json().production.id;
+
+    const res = await app.inject({ headers: actor.headers, method: "GET", url: `/productions/${createdId}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().recipe).toMatchObject({ id: recipeId, name: "Brigadeiro (producao)" });
   });
 
   test("GET /productions/:id inexistente → 404", async () => {
