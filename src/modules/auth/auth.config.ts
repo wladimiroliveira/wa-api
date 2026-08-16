@@ -6,6 +6,7 @@ const authEnvSchema = z.object({
   ACCESS_TOKEN_TTL: z.string().min(1).default("15m"),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
+  REFRESH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
 });
 
 export type AuthConfig = {
@@ -14,6 +15,7 @@ export type AuthConfig = {
   refreshTokenTtlDays: number;
   corsOrigins: string[];
   loginRateLimitMax: number;
+  refreshRateLimitMax: number;
 };
 
 export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig {
@@ -29,6 +31,7 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig
     accessTokenTtl: parsed.data.ACCESS_TOKEN_TTL,
     refreshTokenTtlDays: parsed.data.REFRESH_TOKEN_TTL_DAYS,
     loginRateLimitMax: parsed.data.LOGIN_RATE_LIMIT_MAX,
+    refreshRateLimitMax: parsed.data.REFRESH_RATE_LIMIT_MAX,
     corsOrigins: parsed.data.CORS_ORIGINS.split(",")
       .map((origin) => origin.trim())
       .filter(Boolean),

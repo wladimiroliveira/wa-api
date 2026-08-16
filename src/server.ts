@@ -6,6 +6,7 @@ import routes from "./routes.js";
 import { fastifySwagger } from "@fastify/swagger";
 import { fastifySwaggerUi } from "@fastify/swagger-ui";
 import { fastifyCors } from "@fastify/cors";
+import { fastifyCookie } from "@fastify/cookie";
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform, ZodTypeProvider } from "fastify-type-provider-zod";
 import { Prisma } from "./generated/prisma/index.js";
 import { registerAuth } from "./modules/auth/auth.plugin.js";
@@ -36,10 +37,14 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   const { corsOrigins } = loadAuthConfig();
 
+  await app.register(fastifyCookie);
+
+  // `credentials` só é seguro porque `origin` é lista explícita, nunca curinga.
   await app.register(fastifyCors, {
     origin: corsOrigins,
+    credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "X-Refresh-Delivery"],
   });
 
   await app.register(fastifySwagger, {
@@ -56,6 +61,11 @@ export async function buildApp(): Promise<FastifyInstance> {
             type: "http",
             scheme: "bearer",
             bearerFormat: "JWT",
+          },
+          RefreshCookie: {
+            type: "apiKey",
+            in: "cookie",
+            name: "refreshToken",
           },
         },
       },
