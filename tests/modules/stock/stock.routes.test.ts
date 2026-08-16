@@ -53,9 +53,10 @@ describe("stock routes (integração)", () => {
       method: "GET",
       url: `/supplies/${supplyId}/movements`,
     });
-    expect(movements.json()).toHaveLength(1);
-    expect(movements.json()[0].type).toBe("ENTRY");
-    expect(movements.json()[0].quantityBase).toBe(2000);
+    expect(movements.json().data).toHaveLength(1);
+    expect(movements.json().nextCursor).toBeNull();
+    expect(movements.json().data[0].type).toBe("ENTRY");
+    expect(movements.json().data[0].quantityBase).toBe(2000);
   });
 
   test("dimensão incompatível (insumo em KG, entrada em ML) → 400", async () => {

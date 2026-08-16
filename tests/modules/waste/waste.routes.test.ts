@@ -46,7 +46,7 @@ describe("waste routes (integração)", () => {
     expect(res.json().currentStock).toBe(800); // 1000 - 200
 
     const wastes = await app.inject({ headers: actor.headers, method: "GET", url: "/wastes" });
-    const mine = wastes.json().filter((w: { supplyId: string }) => w.supplyId === supplyId);
+    const mine = wastes.json().data.filter((w: { supplyId: string }) => w.supplyId === supplyId);
     expect(mine).toHaveLength(1);
     expect(mine[0].type).toBe("WASTE");
     expect(mine[0].reason).toBe("SPOILED");

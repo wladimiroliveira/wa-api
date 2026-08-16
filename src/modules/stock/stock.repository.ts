@@ -1,5 +1,6 @@
 import prisma from "../../lib/prisma.js";
 import { Prisma, StockMovementType, WasteReason } from "../../generated/prisma/index.js";
+import { cursorPageArgs, toPage, type CursorPage } from "../shared/pagination.js";
 
 export interface ApplyMovementInput {
   supplyId: string;
@@ -29,9 +30,8 @@ export async function applyMovement(tx: Prisma.TransactionClient, input: ApplyMo
   return movement;
 }
 
-export function listMovements(supplyId: string) {
-  return prisma.stockMovement.findMany({
-    where: { supplyId },
-    orderBy: { createdAt: "desc" },
-  });
+export async function listMovements(supplyId: string, page: CursorPage) {
+  const rows = await prisma.stockMovement.findMany({ where: { supplyId }, ...cursorPageArgs(page) });
+
+  return toPage(rows, page.limit);
 }

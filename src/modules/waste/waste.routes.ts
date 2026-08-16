@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import { createWasteSchema, supplyIdParamSchema, wasteListResponseSchema } from "./waste.schema.js";
+import { createWasteSchema, supplyIdParamSchema, wasteQuerySchema, wastePageResponseSchema } from "./waste.schema.js";
 import { createWaste, listWastes } from "./waste.service.js";
 import { SupplyNotFoundError } from "../stock/stock.service.js";
 import { DimensionMismatchError } from "../shared/dimension.js";
@@ -39,8 +39,11 @@ export default async function wasteRoutes(app: FastifyInstance) {
     "/wastes",
     {
       preHandler: requirePermission(Permission.WASTE_READ),
-      schema: { response: { 200: wasteListResponseSchema, ...protectedErrors } },
+      schema: {
+        querystring: wasteQuerySchema,
+        response: { 200: wastePageResponseSchema, 400: errorSchema, ...protectedErrors },
+      },
     },
-    async () => listWastes(),
+    async (req) => listWastes(req.query),
   );
 }

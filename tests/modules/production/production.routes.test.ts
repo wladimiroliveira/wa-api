@@ -105,9 +105,9 @@ describe("production routes (integração)", () => {
 
     const res = await app.inject({ headers: actor.headers, method: "GET", url: "/productions" });
     expect(res.statusCode).toBe(200);
-    const list = res.json();
-    expect(Array.isArray(list)).toBe(true);
-    expect(list.some((p: { id: string }) => p.id === createdId)).toBe(true);
+    const body = res.json();
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data.some((p: { id: string }) => p.id === createdId)).toBe(true);
   });
 
   test("GET /productions/:id retorna a produção com movements e producedUnits", async () => {

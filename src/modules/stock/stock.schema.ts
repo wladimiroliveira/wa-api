@@ -2,6 +2,7 @@ import { z } from "zod";
 import { unitOfMeasureSchema } from "../supplies/supplies.schema.js";
 import { StockMovementType, WasteReason } from "../../generated/prisma/index.js";
 import { decimalSchema, timestampSchema } from "../shared/response.js";
+import { cursorPageQuerySchema, pageResponseSchema } from "../shared/pagination.js";
 
 export const createStockEntrySchema = z.object({
   quantity: z.number().positive(),
@@ -29,7 +30,10 @@ export const stockMovementResponseSchema = z.object({
   createdAt: timestampSchema,
 });
 
-export const stockMovementListResponseSchema = z.array(stockMovementResponseSchema);
+/** O razão é append-only: sai paginado por cursor, do mais novo ao mais antigo. */
+export const movementPageQuerySchema = cursorPageQuerySchema;
+
+export const stockMovementPageResponseSchema = pageResponseSchema(stockMovementResponseSchema);
 
 /** Envelope de criação compartilhado com waste: o movimento mais o saldo resultante. */
 export const stockEntryResponseSchema = z.object({
