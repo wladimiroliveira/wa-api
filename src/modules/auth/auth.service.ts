@@ -15,6 +15,12 @@ export class InvalidRefreshTokenError extends Error {
   }
 }
 
+export class InvalidCurrentPasswordError extends Error {
+  constructor() {
+    super("Senha atual incorreta");
+  }
+}
+
 /** Hash descartável: mantém o custo do login parecido quando o email não existe. */
 const decoyHash = await hashPassword(generateRefreshToken());
 
@@ -30,6 +36,20 @@ export async function authenticate(username: string, password: string): Promise<
   if (!(await verifyPassword(password, user.passwordHash))) throw new InvalidCredentialsError();
 
   return { id: user.id };
+}
+
+/** Troca feita pela própria pessoa: só passa quem sabe a senha em vigor. */
+export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+  const stored = await repo.findPasswordHash(userId);
+
+  if (!stored || !(await verifyPassword(currentPassword, stored.passwordHash))) throw new InvalidCurrentPasswordError();
+
+  await repo.replacePassword(userId, await hashPassword(newPassword));
+}
+
+/** Reset administrativo: sem senha atual, que é justamente o caso do esquecimento. */
+export async function resetPassword(userId: string, newPassword: string): Promise<void> {
+  await repo.replacePassword(userId, await hashPassword(newPassword));
 }
 
 function expiryFromNow(): Date {

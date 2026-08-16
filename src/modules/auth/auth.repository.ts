@@ -4,6 +4,22 @@ export function findUserForAuthentication(username: string) {
   return prisma.user.findUnique({ where: { username } });
 }
 
+export function findPasswordHash(id: string) {
+  return prisma.user.findUnique({ where: { id }, select: { passwordHash: true } });
+}
+
+/**
+ * A troca da senha e a queda das sessões são uma operação só: se a revogação
+ * falhasse depois da gravação, um refresh token roubado sobreviveria à troca.
+ */
+export function replacePassword(userId: string, passwordHash: string) {
+  return prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+
+    await tx.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+  });
+}
+
 export function findActiveUserWithRole(id: string) {
   return prisma.user.findFirst({ where: { id, isActive: true }, include: { role: true } });
 }
