@@ -79,24 +79,24 @@ stops answering.
 
 ### Environment variables
 
-| Variable                 | Description                                           | Example                                                  |
-| ------------------------ | ----------------------------------------------------- | -------------------------------------------------------- |
-| `API_PORT`               | Port the HTTP server binds to                         | `3333`                                                   |
-| `POSTGRES_USER`          | Role the container is created with                    | `postgres`                                               |
-| `POSTGRES_PASSWORD`      | Password of that role                                 | `postgres`                                               |
-| `POSTGRES_DB`            | Database created on the first boot                    | `wa_api`                                                 |
-| `POSTGRES_HOST`          | Host the API reaches PostgreSQL at                    | `localhost`                                              |
-| `POSTGRES_PORT`          | Port the container publishes on the host              | `5432`                                                   |
-| `DATABASE_URL`           | Connection string assembled from the five above       | `postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@...` |
-| `JWT_SECRET`             | Access token signing key, at least 32 characters      | `a-long-random-string-with-32-plus-chars`                |
-| `CORS_ORIGINS`           | Comma-separated list of allowed origins               | `http://localhost:5173`                                  |
-| `ACCESS_TOKEN_TTL`       | Access token lifetime, defaults to `15m`              | `15m`                                                    |
-| `REFRESH_TOKEN_TTL_DAYS` | Refresh token lifetime in days, defaults to `30`      | `30`                                                     |
-| `LOGIN_RATE_LIMIT_MAX`   | Login attempts per address per 15 min, defaults to 5  | `5`                                                      |
-| `REFRESH_RATE_LIMIT_MAX` | Refresh calls per address per 15 min, defaults to 60  | `60`                                                     |
-| `OWNER_USERNAME`         | First user's login credential, read only by `db:seed` | `owner`                                                  |
-| `OWNER_EMAIL`            | First user's email, read only by `db:seed`            | `owner@example.com`                                      |
-| `OWNER_PASSWORD`         | First user's password, read only by `db:seed`         | `change-this-password`                                   |
+| Variable                 | Description                                                           | Example                                                  |
+| ------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------- |
+| `API_PORT`               | Port the HTTP server binds to                                         | `3333`                                                   |
+| `POSTGRES_USER`          | Role the container is created with                                    | `postgres`                                               |
+| `POSTGRES_PASSWORD`      | Password of that role                                                 | `postgres`                                               |
+| `POSTGRES_DB`            | Database created on the first boot                                    | `wa_api`                                                 |
+| `POSTGRES_HOST`          | Host the API reaches PostgreSQL at                                    | `localhost`                                              |
+| `POSTGRES_PORT`          | Port the container publishes on the host                              | `5432`                                                   |
+| `DATABASE_URL`           | Connection string assembled from the five above                       | `postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@...` |
+| `JWT_SECRET`             | Access token signing key, at least 32 characters                      | `a-long-random-string-with-32-plus-chars`                |
+| `CORS_ORIGINS`           | Comma-separated list of allowed origins                               | `http://localhost:5173`                                  |
+| `ACCESS_TOKEN_TTL`       | Access token lifetime, defaults to `15m`                              | `15m`                                                    |
+| `REFRESH_TOKEN_TTL_DAYS` | Refresh token lifetime in days, defaults to `30`                      | `30`                                                     |
+| `LOGIN_RATE_LIMIT_MAX`   | Login and password-change tries per address per 15 min, defaults to 5 | `5`                                                      |
+| `REFRESH_RATE_LIMIT_MAX` | Refresh calls per address per 15 min, defaults to 60                  | `60`                                                     |
+| `OWNER_USERNAME`         | First user's login credential, read only by `db:seed`                 | `owner`                                                  |
+| `OWNER_EMAIL`            | First user's email, read only by `db:seed`                            | `owner@example.com`                                      |
+| `OWNER_PASSWORD`         | First user's password, read only by `db:seed`                         | `change-this-password`                                   |
 
 `JWT_SECRET` and `CORS_ORIGINS` are required: the server refuses to start without them.
 
@@ -192,10 +192,25 @@ secure context. Native clients are unaffected — they use the body flow, which 
 `POST /sessions/refresh` carries its own rate limit, separate from the login one, because the browser calls it on its
 own — on every page load and whenever the access token expires — and must not spend the budget of someone typing a
 password. Both are per address and per 15 minutes; see `LOGIN_RATE_LIMIT_MAX` and `REFRESH_RATE_LIMIT_MAX`.
+`PATCH /me/password` carries a third bucket, sized by `LOGIN_RATE_LIMIT_MAX` as well.
 
 The refresh token is stored hashed and rotates on every use — replaying an already rotated token revokes the whole
 session, since that signals theft. Users are deactivated rather than deleted, which preserves the production and waste
 history they recorded and revokes their refresh tokens.
+
+### Changing a password
+
+Two routes, because they are two cases with different rules. `PATCH /me/password` takes `currentPassword` and
+`newPassword` and only needs a session: the current password is required because an access token alone does not prove
+presence, so a hijacked session cannot take the account over. `PATCH /users/:id/password` takes `newPassword` alone and
+requires `USERS_WRITE`: whoever administers does not know someone else's password, and forgetting it is the whole point
+of the route. A wrong `currentPassword` answers `403`, not `401`, so the client does not try to renew a session that is
+perfectly valid.
+
+Either route writes the new hash and revokes the user's refresh tokens in the same transaction — a stolen refresh token
+must not outlive the change. On `PATCH /me/password` that includes the session doing the change: its cookies are
+cleared in the same response and everyone logs in again. `PATCH /me/password` shares the login's `LOGIN_RATE_LIMIT_MAX`
+ceiling, in a bucket of its own, because it also accepts password guessing.
 
 `401` means no token, or an invalid, expired or deactivated one. `403` means authenticated but missing the required
 permission — or, on the session routes, a cookie request without a matching `X-CSRF-Token`.
@@ -215,6 +230,7 @@ per status. The schema is enforced at serialization: a field that is not declare
 | `POST`   | `/sessions/refresh`           | public             | Rotates the token pair, by cookie or by body                    |
 | `DELETE` | `/sessions`                   | authenticated      | Logs out by revoking the refresh token and clearing the cookies |
 | `GET`    | `/me`                         | authenticated      | Current user and effective permissions                          |
+| `PATCH`  | `/me/password`                | authenticated      | Changes your own password; every session of yours falls         |
 | `GET`    | `/supplies`                   | `SUPPLIES_READ`    | Lists supplies                                                  |
 | `POST`   | `/supplies`                   | `SUPPLIES_WRITE`   | Creates a supply                                                |
 | `GET`    | `/supplies/:id`               | `SUPPLIES_READ`    | Gets a supply                                                   |
@@ -238,6 +254,7 @@ per status. The schema is enforced at serialization: a field that is not declare
 | `POST`   | `/users`                      | `USERS_WRITE`      | Creates a user                                                  |
 | `GET`    | `/users/:id`                  | `USERS_READ`       | Gets a user                                                     |
 | `PATCH`  | `/users/:id`                  | `USERS_WRITE`      | Edits role, exceptions and `isActive`                           |
+| `PATCH`  | `/users/:id/password`         | `USERS_WRITE`      | Resets someone's password; their sessions fall with it          |
 | `GET`    | `/users/:id/permissions`      | `USERS_READ`       | Effective permission, already computed                          |
 | `GET`    | `/roles`                      | `USERS_READ`       | Lists roles                                                     |
 | `POST`   | `/roles`                      | `USERS_WRITE`      | Creates a role                                                  |
@@ -277,7 +294,7 @@ src/
     waste/               # waste records
     production/          # production registration and consumption
     health/              # liveness and database ping
-    shared/              # units, dimensions and money helpers
+    shared/              # units, dimensions, money and credential helpers
 prisma/                  # schema and migrations
 tests/                   # unit and integration tests
 docs/                    # design documents and implementation plans

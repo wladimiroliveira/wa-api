@@ -1,15 +1,23 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { fastifyRateLimit } from "@fastify/rate-limit";
-import { createSessionSchema, meResponseSchema, refreshSessionSchema, sessionResponseSchema } from "./auth.schema.js";
+import {
+  changePasswordSchema,
+  createSessionSchema,
+  meResponseSchema,
+  refreshSessionSchema,
+  sessionResponseSchema,
+} from "./auth.schema.js";
 import { loadAuthConfig } from "./auth.config.js";
 import { requireAuth } from "./auth.guard.js";
 import {
   authenticate,
+  changePassword,
   issueRefreshToken,
   revokeRefreshToken,
   rotateRefreshToken,
   InvalidCredentialsError,
+  InvalidCurrentPasswordError,
   InvalidRefreshTokenError,
 } from "./auth.service.js";
 import {
@@ -19,7 +27,7 @@ import {
   setSessionCookies,
   wantsBodyDelivery,
 } from "./auth.cookies.js";
-import { errorSchema, noContentSchema } from "../shared/response.js";
+import { errorSchema, noContentSchema, protectedErrors } from "../shared/response.js";
 
 const MISSING_CSRF_TOKEN = "Requisição sem token anti-CSRF válido";
 
@@ -133,5 +141,33 @@ export default async function authRoutes(app: FastifyInstance) {
       ...req.auth.user,
       permissions: [...req.auth.permissions],
     }),
+  );
+
+  r.patch(
+    "/me/password",
+    {
+      preHandler: requireAuth(),
+      // Mesmo teto do login, em balde próprio: também aceita chute de senha.
+      config: { rateLimit: { max: loginRateLimitMax, timeWindow: "15 minutes" } },
+      schema: {
+        body: changePasswordSchema,
+        response: { 204: noContentSchema, 400: errorSchema, 429: errorSchema, ...protectedErrors },
+      },
+    },
+    async (req, reply) => {
+      try {
+        await changePassword(req.auth.user.id, req.body.currentPassword, req.body.newPassword);
+      } catch (err) {
+        // 403, não 401: o token é válido: quem errou foi a senha. Um 401 aqui
+        // mandaria o cliente tentar renovar a sessão sem motivo nenhum.
+        if (err instanceof InvalidCurrentPasswordError) return reply.status(403).send({ message: err.message });
+        throw err;
+      }
+
+      // Toda sessão cai, inclusive esta: o cookie desta some junto com as outras.
+      clearSessionCookies(reply);
+
+      return reply.status(204).send();
+    },
   );
 }

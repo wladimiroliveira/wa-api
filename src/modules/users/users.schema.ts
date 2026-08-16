@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { permissionSchema } from "./roles.schema.js";
+import { passwordSchema } from "../shared/password.js";
 import { usernameSchema } from "../shared/username.js";
 import { timestampSchema } from "../shared/response.js";
 
@@ -7,7 +8,7 @@ export const createUserSchema = z.object({
   name: z.string().min(1),
   username: usernameSchema,
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
   roleId: z.string().uuid().nullable().optional(),
   grantedPermissions: z.array(permissionSchema).default([]),
   deniedPermissions: z.array(permissionSchema).default([]),
@@ -23,10 +24,16 @@ export const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+/** Reset administrativo: sem senha atual, porque quem administra não a conhece. */
+export const resetPasswordSchema = z.object({
+  newPassword: passwordSchema,
+});
+
 export const userIdParamSchema = z.object({ id: z.string().uuid() });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 /** Espelha os publicFields do repositório: tudo menos o hash da senha. */
 export const userResponseSchema = z.object({

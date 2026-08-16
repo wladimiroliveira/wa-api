@@ -231,6 +231,11 @@ describe("openapi: users", () => {
   test("POST /users documenta o 409 de username duplicado", () => {
     expect(responseSchemaOf(app, "post", "/users", 409)).toBeDefined();
   });
+
+  test("PATCH /users/{id}/password documenta o 204 e o 404 de usuário inexistente", () => {
+    expect(responseSchemaOf(app, "patch", "/users/{id}/password", 204)).toEqual({});
+    expect(responseSchemaOf(app, "patch", "/users/{id}/password", 404)).toBeDefined();
+  });
 });
 
 describe("openapi: auth", () => {
@@ -277,6 +282,12 @@ describe("openapi: auth", () => {
     expect(schema.properties).not.toHaveProperty("passwordHash");
   });
 
+  test("PATCH /me/password documenta o 204, o 403 da senha atual errada e o 429 do rate limit", () => {
+    expect(responseSchemaOf(app, "patch", "/me/password", 204)).toEqual({});
+    expect(responseSchemaOf(app, "patch", "/me/password", 403)).toBeDefined();
+    expect(responseSchemaOf(app, "patch", "/me/password", 429)).toBeDefined();
+  });
+
   test("DELETE /sessions documenta o 204", () => {
     expect(responseSchemaOf(app, "delete", "/sessions", 204)).toBeDefined();
     expect(responseSchemaOf(app, "delete", "/sessions", 204)).toEqual({});
@@ -294,7 +305,7 @@ describe("openapi: guarda-corpo", () => {
     expect(missing).toEqual([]);
   });
 
-  test("o documento cobre as 33 rotas da API", () => {
-    expect(operationsOf(app)).toHaveLength(33);
+  test("o documento cobre as 35 rotas da API", () => {
+    expect(operationsOf(app)).toHaveLength(35);
   });
 });

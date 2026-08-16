@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { passwordSchema } from "../shared/password.js";
 import { usernameSchema } from "../shared/username.js";
 import { permissionSchema } from "../users/roles.schema.js";
 
@@ -18,8 +19,18 @@ export const refreshSessionSchema = z
   })
   .nullish();
 
+/**
+ * A senha atual é exigida porque o token de acesso sozinho não prova presença:
+ * quem sequestrou uma sessão não pode trocar a senha e ficar com a conta.
+ */
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: passwordSchema,
+});
+
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type RefreshSessionInput = z.infer<typeof refreshSessionSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 /** O refresh só aparece aqui no modo corpo; no modo cookie ele sai em Set-Cookie. */
 export const sessionResponseSchema = z.object({

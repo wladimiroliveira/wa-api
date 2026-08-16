@@ -4,9 +4,11 @@ import { Permission } from "../../generated/prisma/index.js";
 import { requirePermission } from "../auth/auth.guard.js";
 import { effectivePermissions } from "../auth/auth.permissions.js";
 import { revokeAllRefreshTokens } from "../auth/auth.repository.js";
-import { errorSchema, protectedErrors } from "../shared/response.js";
+import { resetPassword } from "../auth/auth.service.js";
+import { errorSchema, noContentSchema, protectedErrors } from "../shared/response.js";
 import {
   createUserSchema,
+  resetPasswordSchema,
   updateUserSchema,
   userIdParamSchema,
   userListResponseSchema,
@@ -78,6 +80,25 @@ export default async function userRoutes(app: FastifyInstance) {
       if (req.body.isActive === false) await revokeAllRefreshTokens(user.id);
 
       return user;
+    },
+  );
+
+  r.patch(
+    "/users/:id/password",
+    {
+      preHandler: requirePermission(Permission.USERS_WRITE),
+      schema: {
+        params: userIdParamSchema,
+        body: resetPasswordSchema,
+        response: { 204: noContentSchema, 400: errorSchema, 404: errorSchema, ...protectedErrors },
+      },
+    },
+    async (req, reply) => {
+      // A senha atual não é pedida: o caso de uso é justamente o esquecimento.
+      // A troca derruba as sessões do alvo, como a desativação faz.
+      await resetPassword(req.params.id, req.body.newPassword);
+
+      return reply.status(204).send();
     },
   );
 
