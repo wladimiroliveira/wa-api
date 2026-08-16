@@ -244,11 +244,11 @@ per status. The schema is enforced at serialization: a field that is not declare
 | `DELETE` | `/recipes/:id`                | `RECIPES_WRITE`    | Deletes a recipe                                                |
 | `GET`    | `/recipes/:id/pricing`        | `PRICING_READ`     | Returns cost per hundred and suggested prices                   |
 | `POST`   | `/supplies/:id/stock-entries` | `STOCK_WRITE`      | Registers a stock entry                                         |
-| `GET`    | `/supplies/:id/movements`     | `STOCK_READ`       | Lists the ledger movements of a supply                          |
+| `GET`    | `/supplies/:id/movements`     | `STOCK_READ`       | Ledger movements of a supply, paginated                         |
 | `POST`   | `/supplies/:id/wastes`        | `WASTE_WRITE`      | Registers waste for a supply                                    |
-| `GET`    | `/wastes`                     | `WASTE_READ`       | Lists waste records                                             |
+| `GET`    | `/wastes`                     | `WASTE_READ`       | Waste records, paginated and filterable by period               |
 | `POST`   | `/productions`                | `PRODUCTION_WRITE` | Registers a production and consumes the recipe's supplies       |
-| `GET`    | `/productions`                | `PRODUCTION_READ`  | Lists productions                                               |
+| `GET`    | `/productions`                | `PRODUCTION_READ`  | Productions, paginated and filterable by period                 |
 | `GET`    | `/productions/:id`            | `PRODUCTION_READ`  | Gets a production                                               |
 | `GET`    | `/users`                      | `USERS_READ`       | Lists users                                                     |
 | `POST`   | `/users`                      | `USERS_WRITE`      | Creates a user                                                  |
@@ -260,6 +260,29 @@ per status. The schema is enforced at serialization: a field that is not declare
 | `POST`   | `/roles`                      | `USERS_WRITE`      | Creates a role                                                  |
 | `PATCH`  | `/roles/:id`                  | `USERS_WRITE`      | Edits the permission bundle                                     |
 | `DELETE` | `/roles/:id`                  | `USERS_WRITE`      | Removes a role; its users lose the inheritance                  |
+
+### Paginating the ledgers
+
+The three ledger routes — `/supplies/:id/movements`, `/wastes` and `/productions` — are append-only and grow with usage,
+so they never return the whole collection. They answer with a page envelope instead of a bare array:
+
+```json
+{ "data": [], "nextCursor": "3f2b1c8a-0000-4000-8000-000000000000" }
+```
+
+Ask for the next page by echoing `nextCursor` back as `cursor`. The last page carries `nextCursor: null`.
+
+| Parameter | Applies to                | Default | Notes                                                            |
+| --------- | ------------------------- | ------- | ---------------------------------------------------------------- |
+| `limit`   | all three                 | `50`    | Capped at `100`; anything outside the range is a `400`           |
+| `cursor`  | all three                 | —       | The `nextCursor` of the previous page; an unknown id pages empty |
+| `from`    | `/wastes`, `/productions` | —       | Inclusive lower bound, date or ISO 8601 instant                  |
+| `to`      | `/wastes`, `/productions` | —       | Exclusive upper bound, so consecutive windows do not overlap     |
+
+Cursor rather than offset because the ordering is `createdAt` descending over a set that keeps receiving inserts: an
+offset repeats and skips rows whenever something lands between two page reads. The cursor breaks ties by `id`, which
+matters because `CURRENT_TIMESTAMP` is the transaction start time — a production consuming several supplies writes every
+movement at the very same instant.
 
 ## Domain rules
 

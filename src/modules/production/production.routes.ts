@@ -4,7 +4,8 @@ import {
   createProductionSchema,
   productionIdParamSchema,
   productionDetailResponseSchema,
-  productionListResponseSchema,
+  productionQuerySchema,
+  productionPageResponseSchema,
   registerProductionResponseSchema,
 } from "./production.schema.js";
 import { registerProduction, RecipeNotFoundError } from "./production.service.js";
@@ -40,9 +41,12 @@ export default async function productionRoutes(app: FastifyInstance) {
     "/productions",
     {
       preHandler: requirePermission(Permission.PRODUCTION_READ),
-      schema: { response: { 200: productionListResponseSchema, ...protectedErrors } },
+      schema: {
+        querystring: productionQuerySchema,
+        response: { 200: productionPageResponseSchema, 400: errorSchema, ...protectedErrors },
+      },
     },
-    async () => listProductions(),
+    async (req) => listProductions(req.query),
   );
 
   r.get(

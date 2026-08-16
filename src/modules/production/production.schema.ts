@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { decimalSchema, timestampSchema } from "../shared/response.js";
 import { stockMovementResponseSchema } from "../stock/stock.schema.js";
+import { cursorPageQuerySchema, pageResponseSchema } from "../shared/pagination.js";
+import { dateRangeFields, refineDateRange } from "../shared/date-range.js";
 
 export const createProductionSchema = z
   .object({
@@ -26,7 +28,12 @@ export const productionResponseSchema = z.object({
   createdAt: timestampSchema,
 });
 
-export const productionListResponseSchema = z.array(productionResponseSchema);
+/** Livro-razão de produções: página por cursor, opcionalmente recortada por período. */
+export const productionQuerySchema = refineDateRange(cursorPageQuerySchema.extend(dateRangeFields));
+
+export type ProductionQuery = z.infer<typeof productionQuerySchema>;
+
+export const productionPageResponseSchema = pageResponseSchema(productionResponseSchema);
 
 export const productionDetailResponseSchema = productionResponseSchema.extend({
   movements: z.array(stockMovementResponseSchema),

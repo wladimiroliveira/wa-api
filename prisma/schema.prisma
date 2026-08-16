@@ -81,6 +81,11 @@ model StockMovement {
   productionId String?
   production   Production?       @relation(fields: [productionId], references: [id], onDelete: Cascade)
   createdAt    DateTime          @default(now())
+
+  // Sustentam a paginação por cursor do razão: o índice já entrega a ordem, então
+  // a página é uma leitura de faixa em vez de uma ordenação da tabela inteira.
+  @@index([supplyId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([type, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model Production {
@@ -92,6 +97,8 @@ model Production {
   note          String?
   movements     StockMovement[]
   createdAt     DateTime        @default(now())
+
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
 }
 
 enum Permission {

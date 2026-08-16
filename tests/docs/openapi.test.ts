@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../src/server.js";
-import { operationsOf, responseSchemaOf } from "../helpers/openapi.js";
+import { operationsOf, queryParamsOf, responseSchemaOf } from "../helpers/openapi.js";
 
 let app: FastifyInstance;
 
@@ -138,11 +138,18 @@ describe("openapi: stock", () => {
     expect(responseSchemaOf(app, "post", "/supplies/{id}/stock-entries", 404)).toBeDefined();
   });
 
-  test("GET /supplies/{id}/movements documenta a lista do razão", () => {
+  test("GET /supplies/{id}/movements documenta a página do razão", () => {
     expect(responseSchemaOf(app, "get", "/supplies/{id}/movements", 200)).toMatchObject({
-      type: "array",
-      items: { properties: { type: { type: "string" }, quantityBase: { type: "number" } } },
+      type: "object",
+      properties: {
+        data: { type: "array", items: { properties: { type: { type: "string" }, quantityBase: { type: "number" } } } },
+        nextCursor: {},
+      },
     });
+  });
+
+  test("GET /supplies/{id}/movements documenta os controles de paginação", () => {
+    expect(queryParamsOf(app, "get", "/supplies/{id}/movements").sort()).toEqual(["cursor", "limit"]);
   });
 });
 
@@ -153,11 +160,18 @@ describe("openapi: waste", () => {
     });
   });
 
-  test("GET /wastes documenta o insumo aninhado em cada registro", () => {
+  test("GET /wastes documenta o insumo aninhado em cada registro da página", () => {
     expect(responseSchemaOf(app, "get", "/wastes", 200)).toMatchObject({
-      type: "array",
-      items: { properties: { supply: { properties: { name: { type: "string" } } } } },
+      type: "object",
+      properties: {
+        data: { type: "array", items: { properties: { supply: { properties: { name: { type: "string" } } } } } },
+        nextCursor: {},
+      },
     });
+  });
+
+  test("GET /wastes documenta paginação e recorte por período", () => {
+    expect(queryParamsOf(app, "get", "/wastes").sort()).toEqual(["cursor", "from", "limit", "to"]);
   });
 });
 
@@ -175,6 +189,20 @@ describe("openapi: production", () => {
 
   test("POST /productions documenta o 404 de receita inexistente", () => {
     expect(responseSchemaOf(app, "post", "/productions", 404)).toBeDefined();
+  });
+
+  test("GET /productions documenta a página com o cursor da próxima", () => {
+    expect(responseSchemaOf(app, "get", "/productions", 200)).toMatchObject({
+      type: "object",
+      properties: {
+        data: { type: "array", items: { properties: { producedUnits: { type: "number" } } } },
+        nextCursor: {},
+      },
+    });
+  });
+
+  test("GET /productions documenta paginação e recorte por período", () => {
+    expect(queryParamsOf(app, "get", "/productions").sort()).toEqual(["cursor", "from", "limit", "to"]);
   });
 
   test("GET /productions/{id} documenta os movimentos gerados", () => {

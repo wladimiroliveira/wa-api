@@ -4,7 +4,8 @@ import {
   createStockEntrySchema,
   supplyIdParamSchema,
   stockEntryResponseSchema,
-  stockMovementListResponseSchema,
+  movementPageQuerySchema,
+  stockMovementPageResponseSchema,
 } from "./stock.schema.js";
 import { createStockEntry, SupplyNotFoundError } from "./stock.service.js";
 import { DimensionMismatchError } from "../shared/dimension.js";
@@ -46,13 +47,14 @@ export default async function stockRoutes(app: FastifyInstance) {
       preHandler: requirePermission(Permission.STOCK_READ),
       schema: {
         params: supplyIdParamSchema,
-        response: { 200: stockMovementListResponseSchema, 404: errorSchema, ...protectedErrors },
+        querystring: movementPageQuerySchema,
+        response: { 200: stockMovementPageResponseSchema, 400: errorSchema, 404: errorSchema, ...protectedErrors },
       },
     },
     async (req, reply) => {
       const supply = await getSupply(req.params.id);
       if (!supply) return reply.status(404).send({ message: "Insumo não encontrado" });
-      return listMovements(req.params.id);
+      return listMovements(req.params.id, req.query);
     },
   );
 }
