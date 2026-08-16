@@ -12,9 +12,12 @@
     "commit": "cz",
     "test": "vitest run",
     "test:watch": "vitest",
+    "services:up": "docker compose up -d --wait",
+    "services:down": "docker compose down",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "dev:full": "npm run services:up && npm run db:migrate && npm run db:seed && npm run dev"
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",
@@ -24,6 +27,7 @@
     "@fastify/swagger-ui": "5.2.5",
     "@prisma/client": "6.19.3",
     "dotenv": "17.4.2",
+    "dotenv-expand": "1000.0.0",
     "fastify": "5.8.5",
     "fastify-type-provider-zod": "6.1.0",
     "zod": "4.3.6"

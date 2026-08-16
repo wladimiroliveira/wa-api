@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import fastify from "fastify";
-import "dotenv/config";
+import "./lib/env.js";
 import type { FastifyError, FastifyReply, FastifyRequest, FastifyInstance } from "fastify";
 import routes from "./routes.js";
 import { fastifySwagger } from "@fastify/swagger";
