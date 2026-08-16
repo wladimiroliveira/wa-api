@@ -10,6 +10,7 @@
     "lint:prettier:fix": "prettier --write .",
     "prepare": "husky",
     "commit": "cz",
+    "openapi:export": "tsx scripts/export-openapi.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "services:up": "docker compose up -d --wait",
