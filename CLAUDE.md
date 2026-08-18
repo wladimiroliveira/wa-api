@@ -54,6 +54,13 @@ Valem em todos os projetos. Um CLAUDE.md de projeto pode acrescentar, nunca afro
 - Template do repositório não vale: se `.github/pull_request_template.md` existir,
   ignore as seções dele e use o formato acima.
 
+## Design de código
+
+- Ortogonalidade: cada módulo cuida de uma responsabilidade e não conhece o
+  interior dos outros. Mudança em um não pode obrigar mudança em cascata.
+- DRY: um comportamento vive num lugar só. Repetiu regra, constante ou consulta,
+  extraia — não copie e cole.
+
 ## Testes
 
 - TDD, sem exceção: teste que falha primeiro, para feature e para bug.
