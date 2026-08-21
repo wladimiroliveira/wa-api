@@ -1,98 +1,52 @@
-import { fileURLToPath } from "node:url";
 import fastify from "fastify";
-import "./lib/env.js";
-import type { FastifyError, FastifyReply, FastifyRequest, FastifyInstance } from "fastify";
+import "dotenv/config";
 import routes from "./routes.js";
 import { fastifySwagger } from "@fastify/swagger";
 import { fastifySwaggerUi } from "@fastify/swagger-ui";
 import { fastifyCors } from "@fastify/cors";
-import { fastifyCookie } from "@fastify/cookie";
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform, ZodTypeProvider } from "fastify-type-provider-zod";
-import { Prisma } from "./generated/prisma/index.js";
-import { registerAuth } from "./modules/auth/auth.plugin.js";
-import { loadAuthConfig } from "./modules/auth/auth.config.js";
 
-function errorHandler(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === "P2025") return reply.status(404).send({ message: "Recurso não encontrado" });
-    if (error.code === "P2002")
-      return reply.status(409).send({ message: "Já existe um registro com esse valor único" });
-    if (error.code === "P2003") return reply.status(409).send({ message: "Operação viola uma referência existente" });
-  }
+const app = fastify().withTypeProvider<ZodTypeProvider>();
 
-  // validação do zod / erros já com status: preserva
-  if (error.validation || (error.statusCode && error.statusCode < 500)) {
-    return reply.send(error);
-  }
+app.setValidatorCompiler(validatorCompiler);
+app.setSerializerCompiler(serializerCompiler);
 
-  request.log.error(error);
-  return reply.status(500).send({ message: "Erro interno" });
-}
+await app.register(fastifyCors, {
+  origin: ["*"],
+  methods: ["GET", "POST", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+});
 
-export async function buildApp(): Promise<FastifyInstance> {
-  const app = fastify().withTypeProvider<ZodTypeProvider>();
+await app.register(fastifySwagger, {
+  openapi: {
+    info: {
+      title: "wa-api",
+      description: "Backend para o wa-system",
+      version: "0.0.0",
+    },
 
-  app.setValidatorCompiler(validatorCompiler);
-  app.setSerializerCompiler(serializerCompiler);
-
-  const { corsOrigins } = loadAuthConfig();
-
-  await app.register(fastifyCookie);
-
-  // `credentials` só é seguro porque `origin` é lista explícita, nunca curinga.
-  await app.register(fastifyCors, {
-    origin: corsOrigins,
-    credentials: true,
-    methods: ["GET", "POST", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "X-Refresh-Delivery"],
-  });
-
-  await app.register(fastifySwagger, {
-    openapi: {
-      info: {
-        title: "wa-api",
-        description: "Backend para o wa-system",
-        version: "0.0.0",
-      },
-
-      components: {
-        securitySchemes: {
-          BearerAuth: {
-            type: "http",
-            scheme: "bearer",
-            bearerFormat: "JWT",
-          },
-          RefreshCookie: {
-            type: "apiKey",
-            in: "cookie",
-            name: "refreshToken",
-          },
+    components: {
+      securitySchemes: {
+        BearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
         },
       },
-      security: [{ BearerAuth: [] }],
-      servers: [{ url: `http://localhost:${process.env.API_PORT || 3333}`, description: "Servidor local" }],
     },
-    transform: jsonSchemaTransform,
-  });
+    servers: [{ url: `http://localhost:${process.env.API_PORT || 3333}`, description: "Servidor local" }],
+  },
+  transform: jsonSchemaTransform,
+});
 
-  await app.after(app.withTypeProvider);
+await app.after(app.withTypeProvider);
 
-  await app.register(fastifySwaggerUi, {
-    routePrefix: "/docs",
-  });
+await app.register(fastifySwaggerUi, {
+  routePrefix: "/docs",
+});
 
-  await registerAuth(app);
+app.register(routes);
 
-  app.setErrorHandler(errorHandler);
-  app.register(routes);
-
-  return app;
-}
-
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-
-if (isMain) {
-  const app = await buildApp();
-  await app.listen({ port: Number(process.env.API_PORT) || 3333, host: "0.0.0.0" });
+app.listen({ port: Number(process.env.API_PORT) || 3333, host: "0.0.0.0" }).then(() => {
   console.log("Server is running");
-}
+});

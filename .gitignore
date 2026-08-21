@@ -6,6 +6,3 @@ node_modules
 
 # BUILD
 dist
-
-# PRISMA
-src/generated/
