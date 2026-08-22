@@ -142,6 +142,19 @@ model Order {
     expect(rulesFor(source)).toEqual([]);
   });
 
+  it("rejects a relation scalar that neither declares @db.Uuid nor ends in _id", () => {
+    const source = `
+model SaleItem {
+  id      String @id @default(uuid(7)) @db.Uuid
+  sale    Sale   @relation(fields: [saleRef], references: [id])
+  saleRef String @map("sale_ref")
+
+  @@map("sale_items")
+}
+`;
+    expect(rulesFor(source)).toEqual(expect.arrayContaining(["uuid-native-type", "foreign-key-suffix"]));
+  });
+
   it("keeps the project schema free of violations", () => {
     expect(findSchemaConventionViolations(readFileSync("prisma/schema.prisma", "utf8"))).toEqual([]);
   });

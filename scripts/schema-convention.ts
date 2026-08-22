@@ -107,6 +107,24 @@ function readQuotedArgument(source: string, pattern: RegExp): string | null {
   return match === null ? null : match[1];
 }
 
+// The convention calls a foreign key "a relation scalar", so the fields a @relation lists are
+// authoritative; the name heuristic stays as a fallback for a schema that omits the relation.
+function parseRelationScalars(body: string): Set<string> {
+  const names = new Set<string>();
+
+  for (const { text } of parseCalls(body, /@relation\s*\(/g)) {
+    const fields = /fields:\s*\[([^\]]*)\]/.exec(text);
+    if (fields === null) continue;
+
+    for (const name of fields[1].split(",")) {
+      const trimmed = name.trim();
+      if (trimmed !== "") names.add(trimmed);
+    }
+  }
+
+  return names;
+}
+
 export function findSchemaConventionViolations(source: string): SchemaViolation[] {
   const violations: SchemaViolation[] = [];
   const blocks = parseBlocks(stripComments(source));
@@ -143,6 +161,7 @@ export function findSchemaConventionViolations(source: string): SchemaViolation[
       }
     }
 
+    const relationScalars = parseRelationScalars(model.body);
     const scalarFields = parseFields(model.body).filter(
       (field) => SCALAR_TYPES.has(field.type) || enumNames.has(field.type),
     );
@@ -150,7 +169,8 @@ export function findSchemaConventionViolations(source: string): SchemaViolation[
     for (const field of scalarFields) {
       const column = readQuotedArgument(field.attributes, /@map\("([^"]+)"\)/) ?? field.name;
       const isPrimaryKey = /@id\b/.test(field.attributes);
-      const isForeignKey = !isPrimaryKey && (field.name.endsWith("Id") || column.endsWith("_id"));
+      const isForeignKey =
+        !isPrimaryKey && (relationScalars.has(field.name) || field.name.endsWith("Id") || column.endsWith("_id"));
 
       if (!SNAKE_CASE.test(column)) {
         report(field.name, "column-snake-case", `column "${column}" is not snake_case`);
