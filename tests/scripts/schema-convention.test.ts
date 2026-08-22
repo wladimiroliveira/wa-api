@@ -10,6 +10,7 @@ model StockMovement {
   isReversal   Boolean  @default(false) @map("is_reversal")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
+  @@unique([supplyId, quantityBase], map: "uq_stock_movements_supply_id_quantity_base")
   @@index([supplyId, createdAt(sort: Desc), id(sort: Desc)], map: "idx_stock_movements_supply_id_created_at")
   @@map("stock_movements")
 }
@@ -64,6 +65,29 @@ describe("findSchemaConventionViolations", () => {
     expect(rulesFor(COMPLIANT_MODEL.replace(`, map: "idx_stock_movements_supply_id_created_at"`, ""))).toContain(
       "index-map",
     );
+  });
+
+  it("rejects a snake_case identifier field that would silently become TEXT", () => {
+    const source = `
+model Order {
+  id        String @id @db.Uuid
+  supply_id String
+  @@map("orders")
+}
+`;
+    expect(rulesFor(source)).toContain("uuid-native-type");
+  });
+
+  it("rejects a composite unique without an explicit map", () => {
+    expect(rulesFor(COMPLIANT_MODEL.replace(`, map: "uq_stock_movements_supply_id_quantity_base"`, ""))).toContain(
+      "unique-map",
+    );
+  });
+
+  it("rejects a unique constraint name that does not start with uq_", () => {
+    expect(
+      rulesFor(COMPLIANT_MODEL.replace(`"uq_stock_movements_supply_id_quantity_base"`, `"idx_wrong_prefix"`)),
+    ).toContain("unique-prefix");
   });
 
   it("keeps the project schema free of violations", () => {

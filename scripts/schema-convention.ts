@@ -63,13 +63,19 @@ export function findSchemaConventionViolations(source: string): SchemaViolation[
       report(null, "table-plural", `table "${tableName}" is not plural`);
     }
 
-    for (const [index] of model.body.matchAll(/@@index\([^\n]*\)/g)) {
-      const indexName = readQuotedArgument(index, /map:\s*"([^"]+)"/);
+    for (const [constraint, keyword] of model.body.matchAll(/@@(index|unique)\([^\n]*\)/g)) {
+      const isIndex = keyword === "index";
+      const prefix = isIndex ? "idx_" : "uq_";
+      const mapRule = isIndex ? "index-map" : "unique-map";
+      const prefixRule = isIndex ? "index-prefix" : "unique-prefix";
+      const label = isIndex ? "@@index" : "@@unique";
+      const constraintName = readQuotedArgument(constraint, /map:\s*"([^"]+)"/);
 
-      if (indexName === null) {
-        report(null, "index-map", "@@index without an explicit map, whose generated name can be truncated");
-      } else if (!indexName.startsWith("idx_")) {
-        report(null, "index-prefix", `index "${indexName}" does not start with idx_`);
+      if (constraintName === null) {
+        report(null, mapRule, `${label} without an explicit map, whose generated name can be truncated`);
+      } else if (!constraintName.startsWith(prefix)) {
+        const kind = isIndex ? "index" : "unique constraint";
+        report(null, prefixRule, `${kind} "${constraintName}" does not start with ${prefix}`);
       }
     }
 
@@ -80,7 +86,7 @@ export function findSchemaConventionViolations(source: string): SchemaViolation[
     for (const field of scalarFields) {
       const column = readQuotedArgument(field.attributes, /@map\("([^"]+)"\)/) ?? field.name;
       const isPrimaryKey = /@id\b/.test(field.attributes);
-      const isForeignKey = !isPrimaryKey && field.name.endsWith("Id");
+      const isForeignKey = !isPrimaryKey && (field.name.endsWith("Id") || column.endsWith("_id"));
 
       if (!SNAKE_CASE.test(column)) {
         report(field.name, "column-snake-case", `column "${column}" is not snake_case`);
