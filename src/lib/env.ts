@@ -1,3 +1,6 @@
+// Loading the .env here, and not at the entrypoint, keeps the guarantee independent of import order:
+// whoever reaches this module reads an environment that is already complete.
+import "dotenv/config";
 import { z } from "zod";
 
 const envSchema = z.object({
