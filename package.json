@@ -15,7 +15,8 @@
     "services:down": "docker compose down",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "build:prisma-client": "node --input-type=commonjs --eval \"require('node:fs').cpSync('src/generated', 'dist/generated', { recursive: true })\""
+    "build:prisma-client": "node --input-type=commonjs --eval \"require('node:fs').cpSync('src/generated', 'dist/generated', { recursive: true })\"",
+    "prebuild": "npm run db:generate"
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",
