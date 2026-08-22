@@ -13,7 +13,12 @@
 ## Global Constraints
 
 - Identificadores, arquivos, testes e comentários em inglês. Documentação em português.
-- Prettier `printWidth: 120`, `singleQuote: false`. `npx prettier --check .` precisa passar ao fim de cada tarefa.
+- Prettier `printWidth: 120`, `singleQuote: false`. Ao fim de cada tarefa, rode
+  `npx prettier --check` **sobre os arquivos que a tarefa tocou**, e ele precisa
+  passar. Rodar sobre o repositório inteiro (`npx prettier --check .`) falha por
+  causa de `commitlint.config.js`, que vem da `main` com aspas simples e está fora
+  do escopo desta issue. Se você encontrar qualquer outra falha pré-existente,
+  **relate no seu report** — nunca estreite o comando em silêncio para escondê-la.
 - `moduleResolution: node16` — **todo import relativo exige extensão `.js` explícita**. Verificado: `import { PrismaClient } from "../generated/prisma"` falha com `TS2834`; só `"../generated/prisma/index.js"` compila.
 - `@db.Uuid` é obrigatório em toda coluna `uuid`. Verificado: sem ele o Prisma materializa `TEXT`, não `UUID`.
 - `@db.Decimal(p, s)` é obrigatório em todo `Decimal`. Sem ele o Prisma materializa `numeric(65,30)`.
@@ -137,7 +142,7 @@ Expected: PASS, 4 testes.
 
 - [ ] **Step 6: Verificar formatação**
 
-Run: `npx prettier --check .`
+Run: `npx prettier --check <os arquivos que esta tarefa criou ou alterou>`
 Expected: `All matched files use Prettier code style!`
 
 - [ ] **Step 7: Commit (somente com ordem explícita do usuário)**
@@ -226,7 +231,7 @@ Expected: o serviço `postgres` aparece com status `healthy`. Se `docker compose
 
 - [ ] **Step 5: Verificar formatação**
 
-Run: `npx prettier --check .`
+Run: `npx prettier --check <os arquivos que esta tarefa criou ou alterou>`
 Expected: `All matched files use Prettier code style!`
 
 - [ ] **Step 6: Commit (somente com ordem explícita do usuário)**
@@ -331,7 +336,7 @@ Expected: nenhuma saída, código de saída 0.
 
 - [ ] **Step 8: Verificar formatação**
 
-Run: `npx prettier --check .`
+Run: `npx prettier --check <os arquivos que esta tarefa criou ou alterou>`
 Expected: `All matched files use Prettier code style!`
 
 - [ ] **Step 9: Commit (somente com ordem explícita do usuário)**
@@ -579,7 +584,7 @@ Expected: PASS, 15 testes (4 da Task 1 e 11 desta).
 - [ ] **Step 6: Verificar formatação e compilação**
 
 ```bash
-npx prettier --check .
+npx prettier --check <os arquivos que esta tarefa criou ou alterou>
 npx tsc --noEmit
 ```
 
