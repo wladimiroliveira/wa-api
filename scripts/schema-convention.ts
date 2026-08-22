@@ -171,11 +171,14 @@ export function findSchemaConventionViolations(source: string): SchemaViolation[
       const label = isIndex ? "@@index" : "@@unique";
       const constraintName = readQuotedArgument(constraint, /map:\s*"([^"]+)"/);
 
+      const kind = isIndex ? "index" : "unique constraint";
+
       if (constraintName === null) {
         report(null, mapRule, `${label} without an explicit map, whose generated name can be truncated`);
       } else if (!constraintName.startsWith(prefix)) {
-        const kind = isIndex ? "index" : "unique constraint";
         report(null, prefixRule, `${kind} "${constraintName}" does not start with ${prefix}`);
+      } else if (!SNAKE_CASE.test(constraintName)) {
+        report(null, prefixRule, `${kind} "${constraintName}" is not snake_case`);
       }
     }
 

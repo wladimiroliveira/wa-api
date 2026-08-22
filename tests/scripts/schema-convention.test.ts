@@ -207,6 +207,16 @@ enum StockMovementType {
     ]);
   });
 
+  it("rejects an index name that is not snake_case despite the idx_ prefix", () => {
+    const source = COMPLIANT_MODEL.replace(`"idx_stock_movements_supply_id_created_at"`, `"idx_STOCK_MOVEMENTS_ID"`);
+    expect(rulesFor(source)).toContain("index-prefix");
+  });
+
+  it("rejects a unique constraint name that is not snake_case despite the uq_ prefix", () => {
+    const source = COMPLIANT_MODEL.replace(`"uq_stock_movements_supply_id_quantity_base"`, `"uq_STOCK_MOVEMENTS_ID"`);
+    expect(rulesFor(source)).toContain("unique-prefix");
+  });
+
   it("keeps the project schema free of violations", () => {
     expect(findSchemaConventionViolations(readFileSync("prisma/schema.prisma", "utf8"))).toEqual([]);
   });
