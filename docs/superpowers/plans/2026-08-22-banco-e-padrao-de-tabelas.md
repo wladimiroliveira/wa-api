@@ -138,7 +138,7 @@ export function loadEnv(): Env {
 - [ ] **Step 5: Rodar o teste e confirmar o verde**
 
 Run: `npx vitest run tests/lib/env.test.ts`
-Expected: PASS, 4 testes.
+Expected: PASS, 6 testes.
 
 - [ ] **Step 6: Verificar formatação**
 
@@ -574,12 +574,12 @@ export function findSchemaConventionViolations(source: string): SchemaViolation[
 - [ ] **Step 4: Rodar o teste e confirmar o verde**
 
 Run: `npx vitest run tests/scripts/schema-convention.test.ts`
-Expected: PASS, 11 testes.
+Expected: PASS, 31 testes.
 
 - [ ] **Step 5: Rodar a suíte inteira**
 
 Run: `npm test`
-Expected: PASS, 15 testes (4 da Task 1 e 11 desta).
+Expected: PASS, 37 testes (6 de ambiente e 31 de convenção).
 
 - [ ] **Step 6: Verificar formatação e compilação**
 

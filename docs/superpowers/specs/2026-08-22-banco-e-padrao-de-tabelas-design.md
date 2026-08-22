@@ -57,21 +57,21 @@ A regra de ouro: **o banco fala snake_case, o TypeScript fala camelCase, e o
 `@map` é a fronteira entre os dois.** Nenhum SQL manual precisa de aspas duplas,
 e nenhum objeto TypeScript foge do estilo da linguagem.
 
-| Elemento            | Padrão                                            | Exemplo                                            |
-| ------------------- | ------------------------------------------------- | -------------------------------------------------- |
-| Tabela              | `snake_case`, plural, inglês                      | `stock_movements`, `sale_items`                    |
-| Coluna              | `snake_case`, singular                            | `quantity_base`, `created_at`                      |
-| Modelo Prisma       | `PascalCase` singular + `@@map`                   | `model StockMovement { @@map("stock_movements") }` |
-| Campo Prisma        | `camelCase` + `@map`                              | `quantityBase Decimal @map("quantity_base")`       |
-| Chave primária      | sempre `id`                                       | `id`                                               |
-| Chave estrangeira   | `<tabela_referenciada_singular>_id`               | `supply_id`, `sale_id`                             |
-| Booleano            | prefixo `is_` ou `has_`                           | `is_active`                                        |
-| Data e hora         | sufixo `_at`, sempre `timestamptz`                | `created_at`, `revoked_at`                         |
-| Tipo enum           | `snake_case` singular, valores `SCREAMING_SNAKE`  | `stock_movement_type` → `ENTRY`, `SALE`            |
-| Índice              | `map: "idx_<tabela>_<colunas>"`, sempre explícito | `idx_stock_movements_supply_id_created_at`         |
-| `@@unique` composto | `map: "uq_<tabela>_<colunas>"`, sempre explícito  | `uq_stock_movements_supply_id_quantity_base`       |
-| PK, FK, unique      | nome padrão do Prisma, sem `map:`                 |
-| Check               | `ck_<tabela>_<regra>`, escrita à mão na migration | `ck_sale_items_quantity_positive`                  |
+| Elemento            | Padrão                                            | Exemplo                                                       |
+| ------------------- | ------------------------------------------------- | ------------------------------------------------------------- |
+| Tabela              | `snake_case`, plural, inglês                      | `stock_movements`, `sale_items`                               |
+| Coluna              | `snake_case`, singular                            | `quantity_base`, `created_at`                                 |
+| Modelo Prisma       | `PascalCase` singular + `@@map`                   | `model StockMovement { @@map("stock_movements") }`            |
+| Campo Prisma        | `camelCase` + `@map`                              | `quantityBase Decimal @map("quantity_base")`                  |
+| Chave primária      | sempre `id`                                       | `id`                                                          |
+| Chave estrangeira   | `<tabela_referenciada_singular>_id`               | `supply_id`, `sale_id`                                        |
+| Booleano            | prefixo `is_` ou `has_`                           | `is_active`                                                   |
+| Data e hora         | sufixo `_at`, sempre `timestamptz`                | `created_at`, `revoked_at`                                    |
+| Tipo enum           | `snake_case` singular, valores `SCREAMING_SNAKE`  | `stock_movement_type` → `ENTRY`, `SALE`                       |
+| Índice              | `map: "idx_<tabela>_<colunas>"`, sempre explícito | `idx_stock_movements_supply_id_created_at`                    |
+| `@@unique` de bloco | `map: "uq_<tabela>_<colunas>"`, sempre explícito  | `uq_stock_movements_supply_id_quantity_base`                  |
+| PK, FK, unique      | nome padrão do Prisma, sem `map:`                 | `supplies_pkey`, `sale_items_sale_id_fkey`, `users_email_key` |
+| Check               | `ck_<tabela>_<regra>`, escrita à mão na migration | `ck_sale_items_quantity_positive`                             |
 
 O índice é o único que exige `map:` explícito, e a razão é concreta: o nome que o
 Prisma gera sozinho para um índice composto estoura o limite de 63 caracteres do
@@ -176,8 +176,10 @@ O teste lê `prisma/schema.prisma` e falha quando:
 - um campo escalar de relação não termina em `_id` no nome mapeado;
 - um campo `Boolean` não começa com `is` ou `has`;
 - um campo `DateTime` não termina em `At`;
-- um `@@index` não declara `map:` começando com `idx_`;
-- um `@@unique` de bloco não declara `map:` começando com `uq_`.
+- um `@@index` não declara `map:` começando com `idx_`, em snake_case;
+- um `@@unique` de bloco não declara `map:` começando com `uq_`, em snake_case;
+- um `enum` não tem `@@map`, ou o valor do `@@map` não é snake_case;
+- um valor de `enum` não está em `SCREAMING_SNAKE`.
 
 ## Escopo da issue #36
 
