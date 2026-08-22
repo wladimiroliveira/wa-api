@@ -9,3 +9,6 @@ dist
 
 # SUPERPOWERS
 .superpowers
+
+# PRISMA
+src/generated

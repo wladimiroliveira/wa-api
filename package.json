@@ -3,7 +3,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && npm run build:prisma-client",
     "start": "node ./dist/server.js",
     "lint:prettier:check": "prettier --check .",
     "lint:prettier:fix": "prettier --write .",
@@ -12,10 +12,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "services:up": "docker compose up -d --wait",
-    "services:down": "docker compose down"
+    "services:down": "docker compose down",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "build:prisma-client": "node --input-type=commonjs --eval \"require('node:fs').cpSync('src/generated', 'dist/generated', { recursive: true })\""
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",
+    "@prisma/client": "6.19.3",
     "dotenv": "17.4.2",
     "fastify": "5.8.5",
     "fastify-type-provider-zod": "6.1.0",
@@ -29,6 +33,7 @@
     "commitizen": "4.3.1",
     "husky": "9.1.7",
     "prettier": "3.8.3",
+    "prisma": "6.19.3",
     "tsx": "4.21.0",
     "vitest": "4.1.10"
   },
