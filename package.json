@@ -16,7 +16,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "build:prisma-client": "node --input-type=commonjs --eval \"require('node:fs').cpSync('src/generated', 'dist/generated', { recursive: true })\"",
-    "prebuild": "npm run db:generate"
+    "prebuild": "npm run db:generate",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json"
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",
