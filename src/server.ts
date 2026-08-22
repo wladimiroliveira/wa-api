@@ -1,10 +1,12 @@
 import fastify from "fastify";
-import "dotenv/config";
 import routes from "./routes.js";
 import { fastifySwagger } from "@fastify/swagger";
 import { fastifySwaggerUi } from "@fastify/swagger-ui";
 import { fastifyCors } from "@fastify/cors";
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform, ZodTypeProvider } from "fastify-type-provider-zod";
+import { loadEnv } from "./lib/env.js";
+
+const env = loadEnv();
 
 const app = fastify().withTypeProvider<ZodTypeProvider>();
 
@@ -34,7 +36,7 @@ await app.register(fastifySwagger, {
         },
       },
     },
-    servers: [{ url: `http://localhost:${process.env.API_PORT || 3333}`, description: "Servidor local" }],
+    servers: [{ url: `http://localhost:${env.API_PORT}`, description: "Servidor local" }],
   },
   transform: jsonSchemaTransform,
 });
@@ -47,6 +49,6 @@ await app.register(fastifySwaggerUi, {
 
 app.register(routes);
 
-app.listen({ port: Number(process.env.API_PORT) || 3333, host: "0.0.0.0" }).then(() => {
+app.listen({ port: env.API_PORT, host: "0.0.0.0" }).then(() => {
   console.log("Server is running");
 });
