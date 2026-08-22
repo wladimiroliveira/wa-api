@@ -360,7 +360,7 @@ O coração da issue #36. Sem esta tarefa, a convenção é um documento que nin
 **Interfaces:**
 
 - Consumes: `prisma/schema.prisma` da Task 3.
-- Produces: `findSchemaConventionViolations(source: string): SchemaViolation[]`, onde `SchemaViolation = { model: string; field: string | null; rule: string; message: string }`. Os valores de `rule` são exatamente: `table-map`, `table-snake-case`, `table-plural`, `index-map`, `index-prefix`, `column-snake-case`, `uuid-native-type`, `foreign-key-suffix`, `decimal-precision`, `timestamptz`, `datetime-suffix`, `boolean-prefix`.
+- Produces: `findSchemaConventionViolations(source: string): SchemaViolation[]`, onde `SchemaViolation = { model: string; field: string | null; rule: string; message: string }`. Os valores de `rule` são exatamente: `table-map`, `table-snake-case`, `table-plural`, `index-map`, `index-prefix`, `column-snake-case`, `uuid-native-type`, `foreign-key-suffix`, `decimal-precision`, `timestamptz`, `datetime-suffix`, `boolean-prefix`. Durante o review desta tarefa a implementação ganhou mais dois — `unique-map` e `unique-prefix` — porque o `@@unique` de bloco sofre o mesmo truncamento de nome que o `@@index`; o código no repositório é a referência, não os blocos abaixo.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -615,7 +615,7 @@ linhas novas, e travar os valores impediria isso.
 
 ## Limitações aceitas
 
-- **Plural por heurística.** A regra `table-plural` verifica se o nome termina em `s`. Plurais irregulares em inglês passariam despercebidos; nenhum nome de tabela previsto para este domínio cai nesse caso.
+- **Plural por heurística.** A regra `table-plural` verifica se o nome termina em `s`. Isso erra nos dois sentidos: `address` passa sem ser plural (falso negativo) e `people` é **rejeitado** apesar de ser plural legítimo (falso positivo). O falso positivo é o mais incômodo, porque bloqueia um nome válido — se aparecer, a saída é acrescentar a exceção à regra, não contornar o teste. Nenhum nome de tabela previsto para este domínio cai em nenhum dos dois casos.
 - **PK `String` é sempre UUID.** A regra `uuid-native-type` acusa qualquer `String @id` sem `@db.Uuid`. Uma chave primária textual legítima daria falso positivo — a convenção diz que não existe uma.
 - **Check constraints ficam de fora.** O Prisma não as modela; as constraints `ck_` são escritas à mão dentro da migration gerada e o verificador não as enxerga.
 - **`@map` só é exigido quando o nome difere.** A regra `column-snake-case` valida
