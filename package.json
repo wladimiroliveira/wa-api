@@ -8,7 +8,9 @@
     "lint:prettier:check": "prettier --check .",
     "lint:prettier:fix": "prettier --write .",
     "prepare": "husky",
-    "commit": "cz"
+    "commit": "cz",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",
@@ -25,7 +27,8 @@
     "commitizen": "4.3.1",
     "husky": "9.1.7",
     "prettier": "3.8.3",
-    "tsx": "4.21.0"
+    "tsx": "4.21.0",
+    "vitest": "^4.1.10"
   },
   "config": {
     "commitizen": {
