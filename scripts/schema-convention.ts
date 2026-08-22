@@ -11,6 +11,8 @@ type Call = { keyword: string; text: string };
 
 const SCALAR_TYPES = new Set(["String", "Boolean", "Int", "BigInt", "Float", "Decimal", "DateTime", "Json", "Bytes"]);
 const SNAKE_CASE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
+const SCREAMING_SNAKE = /^[A-Z][A-Z0-9_]*$/;
+const MAP_ARGUMENT = /@@map\(\s*"([^"]+)"\s*\)/;
 
 function stripComments(source: string): string {
   let result = "";
@@ -125,17 +127,33 @@ function parseRelationScalars(body: string): Set<string> {
   return names;
 }
 
+function parseEnumValues(body: string): string[] {
+  const values: string[] = [];
+
+  for (const rawLine of body.split("\n")) {
+    const line = rawLine.trim();
+    if (line === "" || line.startsWith("@@")) continue;
+
+    const match = /^(\w+)/.exec(line);
+    if (match !== null) values.push(match[1]);
+  }
+
+  return values;
+}
+
 export function findSchemaConventionViolations(source: string): SchemaViolation[] {
   const violations: SchemaViolation[] = [];
   const blocks = parseBlocks(stripComments(source));
   const enumNames = new Set(blocks.filter((block) => block.kind === "enum").map((block) => block.name));
 
-  for (const model of blocks.filter((block) => block.kind === "model")) {
-    const report = (field: string | null, rule: string, message: string) => {
-      violations.push({ model: model.name, field, rule, message });
-    };
+  const reportFor = (owner: string) => (field: string | null, rule: string, message: string) => {
+    violations.push({ model: owner, field, rule, message });
+  };
 
-    const tableName = readQuotedArgument(model.body, /@@map\(\s*"([^"]+)"\s*\)/);
+  for (const model of blocks.filter((block) => block.kind === "model")) {
+    const report = reportFor(model.name);
+
+    const tableName = readQuotedArgument(model.body, MAP_ARGUMENT);
 
     if (tableName === null) {
       report(null, "table-map", "model does not declare @@map");
@@ -200,6 +218,23 @@ export function findSchemaConventionViolations(source: string): SchemaViolation[
 
       if (field.type === "Boolean" && !/^(is|has)[A-Z]/.test(field.name)) {
         report(field.name, "boolean-prefix", `Boolean field "${field.name}" starts with neither is nor has`);
+      }
+    }
+  }
+
+  for (const enumBlock of blocks.filter((block) => block.kind === "enum")) {
+    const report = reportFor(enumBlock.name);
+    const typeName = readQuotedArgument(enumBlock.body, MAP_ARGUMENT);
+
+    if (typeName === null) {
+      report(null, "enum-map", "enum does not declare @@map");
+    } else if (!SNAKE_CASE.test(typeName)) {
+      report(null, "enum-snake-case", `enum type "${typeName}" is not snake_case`);
+    }
+
+    for (const value of parseEnumValues(enumBlock.body)) {
+      if (!SCREAMING_SNAKE.test(value)) {
+        report(value, "enum-value-case", `enum value "${value}" is not SCREAMING_SNAKE`);
       }
     }
   }

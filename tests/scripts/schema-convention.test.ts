@@ -155,6 +155,58 @@ model SaleItem {
     expect(rulesFor(source)).toEqual(expect.arrayContaining(["uuid-native-type", "foreign-key-suffix"]));
   });
 
+  it("accepts an enum that follows every rule", () => {
+    const source = `
+enum StockMovementType {
+  ENTRY
+  SALE
+
+  @@map("stock_movement_type")
+}
+`;
+    expect(findSchemaConventionViolations(source)).toEqual([]);
+  });
+
+  it("rejects an enum without @@map, whose type would need double quotes in raw SQL", () => {
+    const source = `
+enum StockMovementType {
+  ENTRY
+  SALE
+}
+`;
+    expect(rulesFor(source)).toContain("enum-map");
+  });
+
+  it("rejects an enum type name that is not snake_case", () => {
+    const source = `
+enum StockMovementType {
+  ENTRY
+
+  @@map("StockMovementType")
+}
+`;
+    expect(rulesFor(source)).toContain("enum-snake-case");
+  });
+
+  it("rejects an enum value that is not SCREAMING_SNAKE", () => {
+    const source = `
+enum StockMovementType {
+  ENTRY
+  sale
+
+  @@map("stock_movement_type")
+}
+`;
+    expect(findSchemaConventionViolations(source)).toEqual([
+      {
+        model: "StockMovementType",
+        field: "sale",
+        rule: "enum-value-case",
+        message: `enum value "sale" is not SCREAMING_SNAKE`,
+      },
+    ]);
+  });
+
   it("keeps the project schema free of violations", () => {
     expect(findSchemaConventionViolations(readFileSync("prisma/schema.prisma", "utf8"))).toEqual([]);
   });
