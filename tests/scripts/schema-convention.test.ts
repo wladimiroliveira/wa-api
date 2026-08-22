@@ -90,6 +90,58 @@ model Order {
     ).toContain("unique-prefix");
   });
 
+  it("rejects an indented model, whose rules would otherwise be skipped", () => {
+    const source = `
+  model Order {
+    id        String   @id @default(uuid(7))
+    total     Decimal  @map("total")
+    createdAt DateTime @map("created_at")
+
+    @@map("orders")
+  }
+`;
+    expect(rulesFor(source)).toEqual(expect.arrayContaining(["uuid-native-type", "decimal-precision", "timestamptz"]));
+  });
+
+  it("rejects a multi-line @@index without an explicit map", () => {
+    const source = `
+model Order {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  supplyId  String   @map("supply_id") @db.Uuid
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+
+  @@index([
+    supplyId,
+    createdAt
+  ])
+  @@map("orders")
+}
+`;
+    expect(rulesFor(source)).toContain("index-map");
+  });
+
+  it("rejects a model whose only @@map is commented out", () => {
+    const source = COMPLIANT_MODEL.replace(`  @@map("stock_movements")`, `  // @@map("stock_movements")`);
+    expect(rulesFor(source)).toContain("table-map");
+  });
+
+  it("accepts a commented-out @@index, which creates no index", () => {
+    const source = `
+model Order {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  // @@index([id])
+  @@map("orders")
+}
+`;
+    expect(rulesFor(source)).toEqual([]);
+  });
+
+  it("accepts an @@map with spaces inside the parentheses", () => {
+    const source = COMPLIANT_MODEL.replace(`@@map("stock_movements")`, `@@map( "stock_movements" )`);
+    expect(rulesFor(source)).toEqual([]);
+  });
+
   it("keeps the project schema free of violations", () => {
     expect(findSchemaConventionViolations(readFileSync("prisma/schema.prisma", "utf8"))).toEqual([]);
   });

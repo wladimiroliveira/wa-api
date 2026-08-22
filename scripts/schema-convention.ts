@@ -7,19 +7,83 @@ export type SchemaViolation = {
 
 type Block = { kind: "model" | "enum"; name: string; body: string };
 type Field = { name: string; type: string; attributes: string };
+type Call = { keyword: string; text: string };
 
 const SCALAR_TYPES = new Set(["String", "Boolean", "Int", "BigInt", "Float", "Decimal", "DateTime", "Json", "Bytes"]);
 const SNAKE_CASE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
 
+function stripComments(source: string): string {
+  let result = "";
+  let quoted = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (quoted) {
+      result += char;
+      if (char === '"' || char === "\n") quoted = false;
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = true;
+      result += char;
+      continue;
+    }
+
+    if (char === "/" && source[index + 1] === "/") {
+      while (index < source.length && source[index] !== "\n") index += 1;
+      result += "\n";
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+}
+
 function parseBlocks(source: string): Block[] {
   const blocks: Block[] = [];
-  const blockPattern = /^(model|enum)\s+(\w+)\s*\{([\s\S]*?)^\}/gm;
+  const blockPattern = /^[ \t]*(model|enum)\s+(\w+)\s*\{([\s\S]*?)^[ \t]*\}/gm;
 
   for (const match of source.matchAll(blockPattern)) {
     blocks.push({ kind: match[1] as Block["kind"], name: match[2], body: match[3] });
   }
 
   return blocks;
+}
+
+// Reads every call that `opener` starts, up to its matching closing parenthesis, so a
+// hand-wrapped declaration spanning several lines is still seen as one declaration.
+function parseCalls(source: string, opener: RegExp): Call[] {
+  const calls: Call[] = [];
+
+  for (const match of source.matchAll(opener)) {
+    const start = match.index + match[0].length;
+    let depth = 1;
+    let quoted = false;
+    let index = start;
+
+    for (; index < source.length && depth > 0; index += 1) {
+      const char = source[index];
+
+      if (quoted) {
+        if (char === '"') quoted = false;
+        continue;
+      }
+
+      if (char === '"') quoted = true;
+      else if (char === "(") depth += 1;
+      else if (char === ")") depth -= 1;
+    }
+
+    if (depth === 0) {
+      calls.push({ keyword: match[1] ?? match[0], text: source.slice(match.index, index) });
+    }
+  }
+
+  return calls;
 }
 
 function parseFields(body: string): Field[] {
@@ -45,7 +109,7 @@ function readQuotedArgument(source: string, pattern: RegExp): string | null {
 
 export function findSchemaConventionViolations(source: string): SchemaViolation[] {
   const violations: SchemaViolation[] = [];
-  const blocks = parseBlocks(source);
+  const blocks = parseBlocks(stripComments(source));
   const enumNames = new Set(blocks.filter((block) => block.kind === "enum").map((block) => block.name));
 
   for (const model of blocks.filter((block) => block.kind === "model")) {
@@ -53,7 +117,7 @@ export function findSchemaConventionViolations(source: string): SchemaViolation[
       violations.push({ model: model.name, field, rule, message });
     };
 
-    const tableName = readQuotedArgument(model.body, /@@map\("([^"]+)"\)/);
+    const tableName = readQuotedArgument(model.body, /@@map\(\s*"([^"]+)"\s*\)/);
 
     if (tableName === null) {
       report(null, "table-map", "model does not declare @@map");
@@ -63,7 +127,7 @@ export function findSchemaConventionViolations(source: string): SchemaViolation[
       report(null, "table-plural", `table "${tableName}" is not plural`);
     }
 
-    for (const [constraint, keyword] of model.body.matchAll(/@@(index|unique)\([^\n]*\)/g)) {
+    for (const { keyword, text: constraint } of parseCalls(model.body, /@@(index|unique)\s*\(/g)) {
       const isIndex = keyword === "index";
       const prefix = isIndex ? "idx_" : "uq_";
       const mapRule = isIndex ? "index-map" : "unique-map";
