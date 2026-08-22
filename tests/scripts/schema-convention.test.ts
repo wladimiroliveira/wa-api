@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { findSchemaConventionViolations } from "../../scripts/schema-convention.js";
 
@@ -15,6 +16,8 @@ model StockMovement {
   @@map("stock_movements")
 }
 `;
+
+const SCHEMA_PATH = fileURLToPath(new URL("../../prisma/schema.prisma", import.meta.url));
 
 const rulesFor = (source: string) => findSchemaConventionViolations(source).map((violation) => violation.rule);
 
@@ -207,6 +210,15 @@ enum StockMovementType {
     ]);
   });
 
+  it("rejects a table name that is not snake_case", () => {
+    expect(rulesFor(COMPLIANT_MODEL.replace(`"stock_movements"`, `"StockMovements"`))).toContain("table-snake-case");
+  });
+
+  it("rejects an index name that does not start with idx_", () => {
+    const source = COMPLIANT_MODEL.replace(`"idx_stock_movements_supply_id_created_at"`, `"stock_movements_lookup"`);
+    expect(rulesFor(source)).toContain("index-prefix");
+  });
+
   it("rejects an index name that is not snake_case despite the idx_ prefix", () => {
     const source = COMPLIANT_MODEL.replace(`"idx_stock_movements_supply_id_created_at"`, `"idx_STOCK_MOVEMENTS_ID"`);
     expect(rulesFor(source)).toContain("index-prefix");
@@ -217,7 +229,49 @@ enum StockMovementType {
     expect(rulesFor(source)).toContain("unique-prefix");
   });
 
+  it("rejects a foreign key column that does not end with _id", () => {
+    const source = COMPLIANT_MODEL.replace(`@map("supply_id")`, `@map("supply")`);
+    expect(rulesFor(source)).toContain("foreign-key-suffix");
+  });
+
+  it("rejects a camelCase column whose type is an enum declared in the schema", () => {
+    const source = `
+enum StockMovementType {
+  ENTRY
+
+  @@map("stock_movement_type")
+}
+
+model StockMovement {
+  id           String            @id @default(uuid(7)) @db.Uuid
+  movementType StockMovementType
+
+  @@map("stock_movements")
+}
+`;
+    expect(rulesFor(source)).toContain("column-snake-case");
+  });
+
+  it("reports the model, the field, the rule and the message of a violation", () => {
+    const source = `
+model Order {
+  id      String   @id @default(uuid(7)) @db.Uuid
+  created DateTime @map("created_at") @db.Timestamptz(3)
+
+  @@map("orders")
+}
+`;
+    expect(findSchemaConventionViolations(source)).toEqual([
+      {
+        model: "Order",
+        field: "created",
+        rule: "datetime-suffix",
+        message: `DateTime field "created" does not end with At`,
+      },
+    ]);
+  });
+
   it("keeps the project schema free of violations", () => {
-    expect(findSchemaConventionViolations(readFileSync("prisma/schema.prisma", "utf8"))).toEqual([]);
+    expect(findSchemaConventionViolations(readFileSync(SCHEMA_PATH, "utf8"))).toEqual([]);
   });
 });
