@@ -6,6 +6,18 @@ import { z } from "zod";
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3333),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+  JWT_SECRET: z.string().min(32),
+  ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  CORS_ORIGINS: z
+    .string()
+    .default("")
+    .transform((value) =>
+      value
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter((origin) => origin !== ""),
+    ),
 });
 
 export type Env = z.infer<typeof envSchema>;
