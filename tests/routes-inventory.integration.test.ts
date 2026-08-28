@@ -2,6 +2,7 @@ import fastify from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import { describe, expect, it } from "vitest";
 import routes from "../src/routes.js";
+import { API_PREFIX } from "../src/lib/api-version.js";
 import { registerAccessToken } from "../src/modules/auth/auth.jwt.js";
 
 const SECRET = "a-secret-long-enough-to-be-taken-seriously";
@@ -21,7 +22,7 @@ async function routeInventory(): Promise<string[]> {
     inventory.push(`${[route.method].flat().join(", ")} ${route.url} -> ${String(route.config?.auth)}`);
   });
 
-  await app.register(routes);
+  await app.register(routes, { prefix: API_PREFIX });
   await app.ready();
   await app.close();
 

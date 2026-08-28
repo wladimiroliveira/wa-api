@@ -15,7 +15,7 @@ afterAll(async () => {
 
 describe("test infrastructure", () => {
   it("serves the built application without listening on a port", async () => {
-    const response = await app.inject({ method: "GET", url: "/docs/json" });
+    const response = await app.inject({ method: "GET", url: "/v1/docs/json" });
 
     expect(response.statusCode).toBe(200);
   });

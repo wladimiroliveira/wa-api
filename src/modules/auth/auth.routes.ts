@@ -18,7 +18,7 @@ export default async function authRoutes(app: FastifyInstance) {
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
   typed.post(
-    "/sessions",
+    "/sessions/signin",
     {
       config: {
         auth: PUBLIC,
@@ -74,8 +74,8 @@ export default async function authRoutes(app: FastifyInstance) {
     },
   );
 
-  typed.delete(
-    "/sessions",
+  typed.post(
+    "/sessions/signout",
     {
       config: { auth: AUTHENTICATED },
       schema: {
@@ -93,7 +93,7 @@ export default async function authRoutes(app: FastifyInstance) {
   );
 
   typed.get(
-    "/me",
+    "/sessions/me",
     {
       config: { auth: AUTHENTICATED },
       schema: {

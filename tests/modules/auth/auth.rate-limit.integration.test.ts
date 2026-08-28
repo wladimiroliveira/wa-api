@@ -6,7 +6,7 @@ import { startTestApp } from "../../support/app.js";
 let app: FastifyInstance;
 
 const attemptLogin = (username: string) =>
-  app.inject({ method: "POST", url: "/sessions", payload: { username, password: "wrong" } });
+  app.inject({ method: "POST", url: "/v1/sessions/signin", payload: { username, password: "wrong" } });
 
 beforeAll(async () => {
   app = await startTestApp();
@@ -21,7 +21,7 @@ afterAll(async () => {
   await testPrisma.$disconnect();
 });
 
-describe("POST /sessions rate limit", () => {
+describe("POST /v1/sessions/signin rate limit", () => {
   it("answers 429 once the attempts for one username run out", async () => {
     const codes: number[] = [];
 

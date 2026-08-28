@@ -5,6 +5,7 @@ import { fastifySwaggerUi } from "@fastify/swagger-ui";
 import { fastifyCors } from "@fastify/cors";
 import fastifyRateLimit from "@fastify/rate-limit";
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform, ZodTypeProvider } from "fastify-type-provider-zod";
+import { API_PREFIX } from "./lib/api-version.js";
 import { loadEnv } from "./lib/env.js";
 import { registerAccessToken } from "./modules/auth/auth.jwt.js";
 
@@ -36,11 +37,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.after(app.withTypeProvider);
-  await app.register(fastifySwaggerUi, { routePrefix: "/docs" });
+  await app.register(fastifySwaggerUi, { routePrefix: `${API_PREFIX}/docs` });
 
   await registerAccessToken(app, { secret: env.JWT_SECRET, ttlMinutes: env.ACCESS_TOKEN_TTL_MINUTES });
 
-  await app.register(routes);
+  await app.register(routes, { prefix: API_PREFIX });
   await app.ready();
 
   return app;

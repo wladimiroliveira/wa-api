@@ -23,7 +23,7 @@ async function createUser() {
 }
 
 async function loginAs(username = "tester", password = PASSWORD) {
-  const response = await app.inject({ method: "POST", url: "/sessions", payload: { username, password } });
+  const response = await app.inject({ method: "POST", url: "/v1/sessions/signin", payload: { username, password } });
 
   return { statusCode: response.statusCode, body: response.json() };
 }
@@ -43,7 +43,7 @@ afterAll(async () => {
   await testPrisma.$disconnect();
 });
 
-describe("POST /sessions", () => {
+describe("POST /v1/sessions/signin", () => {
   it("answers 200 and a token pair for the right credentials", async () => {
     await createUser();
 
@@ -66,20 +66,20 @@ describe("POST /sessions", () => {
   });
 
   it("answers 400 when the body does not carry a username", async () => {
-    const response = await app.inject({ method: "POST", url: "/sessions", payload: { password: PASSWORD } });
+    const response = await app.inject({ method: "POST", url: "/v1/sessions/signin", payload: { password: PASSWORD } });
 
     expect(response.statusCode).toBe(400);
   });
 });
 
-describe("POST /sessions/refresh", () => {
+describe("POST /v1/sessions/refresh", () => {
   it("answers a new pair", async () => {
     await createUser();
     const { body } = await loginAs();
 
     const response = await app.inject({
       method: "POST",
-      url: "/sessions/refresh",
+      url: "/v1/sessions/refresh",
       payload: { refreshToken: body.refreshToken },
     });
 
@@ -90,11 +90,11 @@ describe("POST /sessions/refresh", () => {
   it("answers 401 for a token that was already rotated", async () => {
     await createUser();
     const { body } = await loginAs();
-    await app.inject({ method: "POST", url: "/sessions/refresh", payload: { refreshToken: body.refreshToken } });
+    await app.inject({ method: "POST", url: "/v1/sessions/refresh", payload: { refreshToken: body.refreshToken } });
 
     const response = await app.inject({
       method: "POST",
-      url: "/sessions/refresh",
+      url: "/v1/sessions/refresh",
       payload: { refreshToken: body.refreshToken },
     });
 
@@ -102,43 +102,47 @@ describe("POST /sessions/refresh", () => {
   });
 });
 
-describe("DELETE /sessions", () => {
+describe("POST /v1/sessions/signout", () => {
   it("revokes the refresh token presented", async () => {
     await createUser();
     const { body } = await loginAs();
 
-    const logout = await app.inject({
-      method: "DELETE",
-      url: "/sessions",
+    const signout = await app.inject({
+      method: "POST",
+      url: "/v1/sessions/signout",
       headers: { authorization: `Bearer ${body.accessToken}` },
       payload: { refreshToken: body.refreshToken },
     });
 
     const refresh = await app.inject({
       method: "POST",
-      url: "/sessions/refresh",
+      url: "/v1/sessions/refresh",
       payload: { refreshToken: body.refreshToken },
     });
 
-    expect(logout.statusCode).toBe(204);
+    expect(signout.statusCode).toBe(204);
     expect(refresh.statusCode).toBe(401);
   });
 
   it("answers 401 without an access token", async () => {
-    const response = await app.inject({ method: "DELETE", url: "/sessions", payload: { refreshToken: "whatever" } });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/sessions/signout",
+      payload: { refreshToken: "whatever" },
+    });
 
     expect(response.statusCode).toBe(401);
   });
 });
 
-describe("GET /me", () => {
+describe("GET /v1/sessions/me", () => {
   it("answers the current user and the permission the role and the extras add up to", async () => {
     const user = await createUser();
     const { body } = await loginAs();
 
     const response = await app.inject({
       method: "GET",
-      url: "/me",
+      url: "/v1/sessions/me",
       headers: { authorization: `Bearer ${body.accessToken}` },
     });
 
@@ -160,7 +164,7 @@ describe("GET /me", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/me",
+      url: "/v1/sessions/me",
       headers: { authorization: `Bearer ${body.accessToken}` },
     });
 
@@ -168,8 +172,8 @@ describe("GET /me", () => {
   });
 });
 
-describe("GET /health", () => {
+describe("GET /v1/health", () => {
   it("answers without a token", async () => {
-    expect((await app.inject({ method: "GET", url: "/health" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/v1/health" })).statusCode).toBe(200);
   });
 });
