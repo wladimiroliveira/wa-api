@@ -45,3 +45,9 @@ export async function revokeRefreshToken(id: string): Promise<void> {
 export async function revokeAllRefreshTokens(userId: string): Promise<void> {
   await prisma.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
 }
+
+// The password is auth's business, per Decision 4, so its write lives here rather than in the users
+// module: keeping it there would make auth import users and invert the dependency.
+export async function updatePasswordHash(id: string, passwordHash: string): Promise<void> {
+  await prisma.user.update({ where: { id }, data: { passwordHash } });
+}
