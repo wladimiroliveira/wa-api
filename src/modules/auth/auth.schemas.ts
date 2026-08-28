@@ -24,3 +24,8 @@ export const currentUserSchema = z.object({
   roleId: z.uuid().nullable(),
   permissions: z.array(z.enum(Permission)),
 });
+
+export const changeOwnPasswordBodySchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
