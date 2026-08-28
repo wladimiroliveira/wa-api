@@ -67,19 +67,24 @@ describe("loadEnv", () => {
     vi.resetModules();
   });
 
+  // Every variable the assertion names is stubbed: the module loads the developer's .env, so a case
+  // that left one of them to the default would pass or fail depending on the machine it runs on.
   it("reads the variables from the process environment", async () => {
     vi.stubEnv("DATABASE_URL", DATABASE_URL);
     vi.stubEnv("JWT_SECRET", JWT_SECRET);
     vi.stubEnv("API_PORT", "4100");
+    vi.stubEnv("ACCESS_TOKEN_TTL_MINUTES", "5");
+    vi.stubEnv("REFRESH_TOKEN_TTL_DAYS", "7");
+    vi.stubEnv("CORS_ORIGINS", "https://app.example.com");
     const { loadEnv } = await importEnv();
 
     expect(loadEnv()).toEqual({
       API_PORT: 4100,
       DATABASE_URL,
       JWT_SECRET,
-      ACCESS_TOKEN_TTL_MINUTES: 15,
-      REFRESH_TOKEN_TTL_DAYS: 30,
-      CORS_ORIGINS: [],
+      ACCESS_TOKEN_TTL_MINUTES: 5,
+      REFRESH_TOKEN_TTL_DAYS: 7,
+      CORS_ORIGINS: ["https://app.example.com"],
     });
   });
 
