@@ -110,7 +110,7 @@ depende do relógio.
 ### Desativar em vez de apagar
 
 Usuário tem `is_active`. Desligar corta o acesso no request seguinte e revoga
-todos os refresh tokens da pessoa. Não existe `DELETE /users/:id`: o livro de
+todos os refresh tokens da pessoa. Não existe `DELETE /v1/users/:id`: o livro de
 movimentações precisa continuar explicando quem lançou o quê, e a regra 4 da #36
 já proíbe apagar cadastro referenciado por movimento.
 
@@ -190,10 +190,10 @@ A #19 mostrou o custo de deixar isso para depois: a senha do Owner vinha de
 variável de ambiente, provavelmente compartilhada, e não havia caminho para
 trocá-la. Duas rotas, porque são dois casos com regras diferentes:
 
-| Rota                        | Acesso          | Corpo                              | Caso                                  |
-| --------------------------- | --------------- | ---------------------------------- | ------------------------------------- |
-| `PATCH /me/password`        | `AUTHENTICATED` | `{ currentPassword, newPassword }` | A pessoa troca a própria senha        |
-| `PATCH /users/:id/password` | `ACCESS_UPDATE` | `{ newPassword }`                  | Administrador reseta a senha de outro |
+| Rota                             | Acesso          | Corpo                              | Caso                                  |
+| -------------------------------- | --------------- | ---------------------------------- | ------------------------------------- |
+| `PATCH /v1/sessions/me/password` | `AUTHENTICATED` | `{ currentPassword, newPassword }` | A pessoa troca a própria senha        |
+| `PATCH /v1/users/:id/password`   | `ACCESS_UPDATE` | `{ newPassword }`                  | Administrador reseta a senha de outro |
 
 A senha atual é exigida no primeiro caso e não no segundo — quem administra não
 conhece a senha alheia, e o esquecimento é justamente o cenário.
@@ -206,7 +206,7 @@ e mais defensável do que preservar a sessão corrente.
 ### Força bruta
 
 Ponto que a #12 deixou em aberto; fica fechado aqui. `@fastify/rate-limit` em
-`POST /sessions` e `PATCH /me/password`, limitando por IP e por username — só
+`POST /v1/sessions/signin` e `PATCH /v1/sessions/me/password`, limitando por IP e por username — só
 por IP não segura NAT compartilhado, e só por username permite varrer contas de
 um IP só.
 
@@ -228,14 +228,14 @@ Não existe cadastro aberto. Usuário só nasce pela mão de quem tem
 
 Entram no schema Zod de `src/lib/env.ts` e em `.example.env`, com uma exceção anotada abaixo:
 
-| Variável                   | Papel                                                     |
-| -------------------------- | --------------------------------------------------------- |
-| `JWT_SECRET`               | Assinatura do access token; mínimo de 32 caracteres       |
-| `ACCESS_TOKEN_TTL_MINUTES` | Padrão 15                                                 |
-| `REFRESH_TOKEN_TTL_DAYS`   | Padrão 30                                                 |
-| `CORS_ORIGINS`             | Lista explícita de origens; o `origin: ["*"]` de hoje sai |
-| `OWNER_USERNAME`           | Usuário inicial do seed                                   |
-| `OWNER_PASSWORD`           | Senha inicial do seed, trocável por `PATCH /me/password`  |
+| Variável                   | Papel                                                                |
+| -------------------------- | -------------------------------------------------------------------- |
+| `JWT_SECRET`               | Assinatura do access token; mínimo de 32 caracteres                  |
+| `ACCESS_TOKEN_TTL_MINUTES` | Padrão 15                                                            |
+| `REFRESH_TOKEN_TTL_DAYS`   | Padrão 30                                                            |
+| `CORS_ORIGINS`             | Lista explícita de origens; o `origin: ["*"]` de hoje sai            |
+| `OWNER_USERNAME`           | Usuário inicial do seed                                              |
+| `OWNER_PASSWORD`           | Senha inicial do seed, trocável por `PATCH /v1/sessions/me/password` |
 
 `OWNER_USERNAME` e `OWNER_PASSWORD` são a exceção: ficam apenas em `.example.env` e são lidas
 pelo seed, nunca pelo schema da aplicação. Exigi-las no boot obrigaria todo ambiente a carregar para
@@ -290,6 +290,49 @@ Dentro de `auth`, o miolo fica em unidades pequenas, testáveis sem banco e sem
 HTTP: a função pura da permissão efetiva, o hash e a verificação de senha, e a
 emissão e verificação de tokens. Rota não conhece o interior de nenhuma delas.
 
+## Decisão 5 — versão no caminho, e ação nomeada onde o verbo não basta
+
+Acrescentada depois da Fase 1, com a #35 em curso. Duas regras de endereço, uma
+para o tempo e outra para a leitura.
+
+### Toda rota vive sob `/v1`
+
+O prefixo entra num lugar só, no registro do módulo de rotas
+(`app.register(routes, { prefix: API_PREFIX })`), com `API_PREFIX` numa constante
+em `src/lib/api-version.ts`. Nenhuma rota escreve a versão no próprio caminho:
+repetir `/v1` em quinze declarações é o conhecimento duplicado que a #36 proibiu,
+e bastaria uma esquecida para a API falar duas versões ao mesmo tempo. Um `/v2`
+nasce como um segundo módulo de rotas registrado sob outro prefixo, sem tocar em
+rota nenhuma do primeiro.
+
+Saúde e documentação entram junto: `/v1/health` e `/v1/docs`. Deixá-las fora
+economizaria uma mudança de endereço na monitoração no dia do `/v2`, mas ao preço
+de duas regras onde cabe uma — e a regra única é a que ninguém erra ao criar
+módulo novo.
+
+O `servers` do OpenAPI continua sem a versão, só com a origem. O `@fastify/swagger`
+já coleta os caminhos com o prefixo aplicado, e repetir `/v1` nos dois lugares
+montaria `/v1/v1/...` em quem lesse o documento.
+
+### O caminho diz o módulo, e a ação só quando o verbo não a expressa
+
+O primeiro segmento depois da versão é sempre o módulo, no plural. O que vem
+depois depende de o verbo HTTP já dizer o que se faz:
+
+- **CRUD segue REST.** `GET /v1/users`, `POST /v1/users`, `PATCH /v1/users/:id`,
+  `DELETE /v1/roles/:id`. Nomear a ação aqui seria escrever duas vezes o que o
+  método já diz, e cobraria de cache e proxy que adivinhassem a intenção.
+- **O que não é CRUD ganha nome.** Entrar e sair não são criação nem remoção de
+  recurso: são `POST /v1/sessions/signin` e `POST /v1/sessions/signout`.
+
+`signout` usa `POST`, e não `DELETE`: o refresh token a revogar viaja no corpo, e
+`DELETE` com corpo é mal servido por proxy e por cliente HTTP.
+
+Tudo o que é do "eu autenticado" mora sob `/v1/sessions/me` — o cadastro atual em
+`GET /v1/sessions/me`, a troca da própria senha em
+`PATCH /v1/sessions/me/password`. O reset feito por administrador continua em
+`/v1/users/:id/password`, porque é outro caso, com outra permissão e outro corpo.
+
 ## Modelo de dados
 
 Sob a convenção da #36: `snake_case` no banco, `camelCase` no TypeScript,
@@ -313,27 +356,30 @@ detecção de reuso passam todas por ela. `token_hash` usa `@unique` de campo
 
 ## Superfície HTTP
 
-| Método   | Rota                  | Acesso          | Descrição                                    |
-| -------- | --------------------- | --------------- | -------------------------------------------- |
-| `POST`   | `/sessions`           | `PUBLIC`        | Login; devolve o par de tokens               |
-| `POST`   | `/sessions/refresh`   | `PUBLIC`        | Rotaciona o par                              |
-| `DELETE` | `/sessions`           | `AUTHENTICATED` | Logout; revoga o refresh apresentado         |
-| `GET`    | `/me`                 | `AUTHENTICATED` | Usuário atual e suas permissões efetivas     |
-| `PATCH`  | `/me/password`        | `AUTHENTICATED` | Troca a própria senha                        |
-| `GET`    | `/users`              | `ACCESS_READ`   | Lista usuários                               |
-| `POST`   | `/users`              | `ACCESS_CREATE` | Cria usuário                                 |
-| `GET`    | `/users/:id`          | `ACCESS_READ`   | Cadastro e permissões efetivas já calculadas |
-| `PATCH`  | `/users/:id`          | `ACCESS_UPDATE` | Papel, avulsas, nome e `is_active`           |
-| `PATCH`  | `/users/:id/password` | `ACCESS_UPDATE` | Reseta a senha de outro                      |
-| `GET`    | `/roles`              | `ACCESS_READ`   | Lista papéis                                 |
-| `POST`   | `/roles`              | `ACCESS_CREATE` | Cria papel                                   |
-| `PATCH`  | `/roles/:id`          | `ACCESS_UPDATE` | Edita nome e pacote de permissões            |
-| `DELETE` | `/roles/:id`          | `ACCESS_UPDATE` | Remove papel; usuários ficam sem herança     |
-| `GET`    | `/health`, `/docs`    | `PUBLIC`        | Saúde e documentação                         |
+Sob a Decisão 5: todo caminho começa em `/v1`, o segmento seguinte é o módulo, e
+a ação só é nomeada onde o verbo HTTP não a expressa.
 
-Não existe `GET /users/:id/permissions`: como a fórmula é união pura,
-`GET /users/:id` devolve as efetivas junto do cadastro. Não existe
-`DELETE /users/:id`, pela Decisão 1.
+| Método   | Rota                       | Acesso          | Descrição                                    |
+| -------- | -------------------------- | --------------- | -------------------------------------------- |
+| `POST`   | `/v1/sessions/signin`      | `PUBLIC`        | Login; devolve o par de tokens               |
+| `POST`   | `/v1/sessions/refresh`     | `PUBLIC`        | Rotaciona o par                              |
+| `POST`   | `/v1/sessions/signout`     | `AUTHENTICATED` | Logout; revoga o refresh apresentado         |
+| `GET`    | `/v1/sessions/me`          | `AUTHENTICATED` | Usuário atual e suas permissões efetivas     |
+| `PATCH`  | `/v1/sessions/me/password` | `AUTHENTICATED` | Troca a própria senha                        |
+| `GET`    | `/v1/users`                | `ACCESS_READ`   | Lista usuários                               |
+| `POST`   | `/v1/users`                | `ACCESS_CREATE` | Cria usuário                                 |
+| `GET`    | `/v1/users/:id`            | `ACCESS_READ`   | Cadastro e permissões efetivas já calculadas |
+| `PATCH`  | `/v1/users/:id`            | `ACCESS_UPDATE` | Papel, avulsas, nome e `is_active`           |
+| `PATCH`  | `/v1/users/:id/password`   | `ACCESS_UPDATE` | Reseta a senha de outro                      |
+| `GET`    | `/v1/roles`                | `ACCESS_READ`   | Lista papéis                                 |
+| `POST`   | `/v1/roles`                | `ACCESS_CREATE` | Cria papel                                   |
+| `PATCH`  | `/v1/roles/:id`            | `ACCESS_UPDATE` | Edita nome e pacote de permissões            |
+| `DELETE` | `/v1/roles/:id`            | `ACCESS_UPDATE` | Remove papel; usuários ficam sem herança     |
+| `GET`    | `/v1/health`, `/v1/docs`   | `PUBLIC`        | Saúde e documentação                         |
+
+Não existe `GET /v1/users/:id/permissions`: como a fórmula é união pura,
+`GET /v1/users/:id` devolve as efetivas junto do cadastro. Não existe
+`DELETE /v1/users/:id`, pela Decisão 1.
 
 As rotas do domínio — catálogo, entradas, fabricação, vendas, indicadores —
 declaram sua permissão quando forem criadas, nas issues que modelarem o negócio.
@@ -343,8 +389,8 @@ declaram sua permissão quando forem criadas, nas issues que modelarem o negóci
 - `401` — token ausente, malformado, com assinatura inválida, expirado, ou de
   usuário desativado ou inexistente. A credencial deixou de valer.
 - `403` — autenticado, mas sem a permissão que a rota exige.
-- `429` — limite de tentativas atingido em `POST /sessions` ou
-  `PATCH /me/password`.
+- `429` — limite de tentativas atingido em `POST /v1/sessions/signin` ou
+  `PATCH /v1/sessions/me/password`.
 
 Mensagem de erro de autenticação não distingue "usuário não existe" de "senha
 errada". O formato do corpo de erro é assunto do tratador de erros da API, que
@@ -399,8 +445,8 @@ Ambas em `dependencies`, não em `devDependencies`: rodam em produção.
 - **Refresh token no corpo.** O front fica com o dilema da #18. Aceito
   conscientemente em troca de não fechar a API no navegador. Se o `wa-web` for
   o único cliente daqui a alguns meses, migrar para cookie `httpOnly` é uma
-  mudança contida em `POST /sessions`, `POST /sessions/refresh` e
-  `DELETE /sessions`.
+  mudança contida em `POST /v1/sessions/signin`,
+  `POST /v1/sessions/refresh` e `POST /v1/sessions/signout`.
 - **Permissão por módulo cruzando telas.** O modo de falha da #29 não é
   eliminado pelo modelo, e sim mitigado por disciplina de resposta completa em
   cada rota. Cada rota nova do domínio precisa perguntar de quais dados a tela

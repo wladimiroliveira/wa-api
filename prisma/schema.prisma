@@ -7,3 +7,62 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Permission {
+  CATALOG_READ
+  CATALOG_CREATE
+  CATALOG_UPDATE
+  ENTRIES_READ
+  ENTRIES_CREATE
+  PRODUCTION_READ
+  PRODUCTION_CREATE
+  SALES_READ
+  SALES_CREATE
+  REPORTS_READ
+  ACCESS_READ
+  ACCESS_CREATE
+  ACCESS_UPDATE
+
+  @@map("permission")
+}
+
+model Role {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  name        String       @unique
+  permissions Permission[]
+  users       User[]
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("roles")
+}
+
+model User {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  name             String
+  username         String         @unique
+  passwordHash     String         @map("password_hash")
+  roleId           String?        @map("role_id") @db.Uuid
+  role             Role?          @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  extraPermissions Permission[]   @map("extra_permissions")
+  isActive         Boolean        @default(true) @map("is_active")
+  refreshTokens    RefreshToken[]
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique @map("token_hash")
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
+  replacedById String?   @map("replaced_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([userId], map: "idx_refresh_tokens_user_id")
+  @@map("refresh_tokens")
+}

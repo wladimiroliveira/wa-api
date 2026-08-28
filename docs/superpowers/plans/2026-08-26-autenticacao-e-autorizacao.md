@@ -30,6 +30,7 @@
 | Arquivo                                  | Responsabilidade                                              |
 | ---------------------------------------- | ------------------------------------------------------------- |
 | `prisma/schema.prisma`                   | Enum `Permission` e os modelos `Role`, `User`, `RefreshToken` |
+| `src/lib/api-version.ts`                 | A versão da API e o prefixo de todas as rotas, num lugar só   |
 | `src/app.ts`                             | Monta a instância Fastify e devolve; sem `listen`             |
 | `src/server.ts`                          | Só o `listen`, usando `buildApp()`                            |
 | `src/modules/auth/auth.permissions.ts`   | Função pura da permissão efetiva                              |
@@ -58,6 +59,11 @@ O plano tem duas fases. A **Fase 1** entrega a API fechada e o login funcionando
 # Fase 1 — fundação da autenticação
 
 Branch: `feat/auth-foundation`
+
+Todos os caminhos deste plano seguem a Decisão 5 do spec: o prefixo `/v1` é aplicado uma única vez,
+no registro do módulo de rotas, e nenhuma rota o escreve no próprio caminho. O que aparece nos blocos
+de `src` é sempre o caminho sem versão; o que aparece nos testes e na documentação é o caminho
+completo que o cliente chama.
 
 ### Task 1: Schema, enum de permissões e migration
 
@@ -276,7 +282,7 @@ afterAll(async () => {
 
 describe("test infrastructure", () => {
   it("serves the built application without listening on a port", async () => {
-    const response = await app.inject({ method: "GET", url: "/docs/json" });
+    const response = await app.inject({ method: "GET", url: "/v1/docs/json" });
 
     expect(response.statusCode).toBe(200);
   });
@@ -309,6 +315,7 @@ import { fastifySwagger } from "@fastify/swagger";
 import { fastifySwaggerUi } from "@fastify/swagger-ui";
 import { fastifyCors } from "@fastify/cors";
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform, ZodTypeProvider } from "fastify-type-provider-zod";
+import { API_PREFIX } from "./lib/api-version.js";
 import { loadEnv } from "./lib/env.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -336,8 +343,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.after(app.withTypeProvider);
-  await app.register(fastifySwaggerUi, { routePrefix: "/docs" });
-  await app.register(routes);
+  await app.register(fastifySwaggerUi, { routePrefix: `${API_PREFIX}/docs` });
+  await app.register(routes, { prefix: API_PREFIX });
   await app.ready();
 
   return app;
@@ -1143,7 +1150,7 @@ describe("applyAccessControl", () => {
       scope.get("/health", { config: { auth: PUBLIC } }, async () => ({ ok: true }));
     });
 
-    expect((await app.inject({ method: "GET", url: "/health" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/v1/health" })).statusCode).toBe(200);
 
     await app.close();
   });
@@ -1153,7 +1160,7 @@ describe("applyAccessControl", () => {
       scope.get("/me", { config: { auth: AUTHENTICATED } }, async () => ({ ok: true }));
     });
 
-    expect((await app.inject({ method: "GET", url: "/me" })).statusCode).toBe(401);
+    expect((await app.inject({ method: "GET", url: "/v1/sessions/me" })).statusCode).toBe(401);
 
     await app.close();
   });
@@ -1163,7 +1170,11 @@ describe("applyAccessControl", () => {
       scope.get("/me", { config: { auth: AUTHENTICATED } }, async () => ({ ok: true }));
     });
 
-    const response = await app.inject({ method: "GET", url: "/me", headers: { authorization: "Bearer garbage" } });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sessions/me",
+      headers: { authorization: "Bearer garbage" },
+    });
 
     expect(response.statusCode).toBe(401);
 
@@ -1175,7 +1186,7 @@ describe("applyAccessControl", () => {
       scope.get("/me", { config: { auth: AUTHENTICATED } }, async () => ({ ok: true }));
     }, null);
 
-    const response = await app.inject({ method: "GET", url: "/me", headers: bearer(app) });
+    const response = await app.inject({ method: "GET", url: "/v1/sessions/me", headers: bearer(app) });
 
     expect(response.statusCode).toBe(401);
 
@@ -1187,7 +1198,7 @@ describe("applyAccessControl", () => {
       scope.get("/me", { config: { auth: AUTHENTICATED } }, async (request) => request.currentUser);
     });
 
-    const response = await app.inject({ method: "GET", url: "/me", headers: bearer(app) });
+    const response = await app.inject({ method: "GET", url: "/v1/sessions/me", headers: bearer(app) });
 
     expect(response.json()).toEqual(USER);
 
@@ -1199,7 +1210,7 @@ describe("applyAccessControl", () => {
       scope.get("/sales", { config: { auth: Permission.SALES_READ } }, async () => ({ ok: true }));
     });
 
-    expect((await app.inject({ method: "GET", url: "/sales", headers: bearer(app) })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/v1/sales", headers: bearer(app) })).statusCode).toBe(200);
 
     await app.close();
   });
@@ -1209,7 +1220,7 @@ describe("applyAccessControl", () => {
       scope.post("/sales", { config: { auth: Permission.SALES_CREATE } }, async () => ({ ok: true }));
     });
 
-    expect((await app.inject({ method: "POST", url: "/sales", headers: bearer(app) })).statusCode).toBe(403);
+    expect((await app.inject({ method: "POST", url: "/v1/sales", headers: bearer(app) })).statusCode).toBe(403);
 
     await app.close();
   });
@@ -1674,7 +1685,7 @@ git add src/modules/auth tests/modules/auth
 git commit -m "feat(auth): issue, rotate and revoke sessions"
 ```
 
-### Task 10: Rotas de sessão e `/me`, com a API fechada
+### Task 10: Rotas de sessão e `/v1/sessions/me`, com a API fechada
 
 Esta é a tarefa em que a API deixa de ser aberta: `applyAccessControl` entra no escopo de `routes.ts`, e a partir dela toda rota nova é obrigada a declarar seu acesso.
 
@@ -1689,7 +1700,7 @@ Esta é a tarefa em que a API deixa de ser aberta: `applyAccessControl` entra no
 **Interfaces:**
 
 - Consumes: `login`, `refreshSession`, `logout` (Task 9), `applyAccessControl`, `PUBLIC`, `AUTHENTICATED` (Task 8), `registerAccessToken` (Task 7), `loadAuthenticatedUser` (Task 9).
-- Produces: as rotas `POST /sessions`, `POST /sessions/refresh`, `DELETE /sessions`, `GET /me`, `GET /health`.
+- Produces: as rotas `POST /sessions/signin`, `POST /sessions/refresh`, `POST /sessions/signout`, `GET /sessions/me`, `GET /health`, todas servidas sob o prefixo `/v1`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1721,7 +1732,7 @@ async function createUser() {
 }
 
 async function loginAs(username = "tester", password = PASSWORD) {
-  const response = await app.inject({ method: "POST", url: "/sessions", payload: { username, password } });
+  const response = await app.inject({ method: "POST", url: "/v1/sessions/signin", payload: { username, password } });
 
   return { statusCode: response.statusCode, body: response.json() };
 }
@@ -1739,7 +1750,7 @@ afterAll(async () => {
   await testPrisma.$disconnect();
 });
 
-describe("POST /sessions", () => {
+describe("POST /v1/sessions/signin", () => {
   it("answers 200 and a token pair for the right credentials", async () => {
     await createUser();
 
@@ -1762,20 +1773,20 @@ describe("POST /sessions", () => {
   });
 
   it("answers 400 when the body does not carry a username", async () => {
-    const response = await app.inject({ method: "POST", url: "/sessions", payload: { password: PASSWORD } });
+    const response = await app.inject({ method: "POST", url: "/v1/sessions/signin", payload: { password: PASSWORD } });
 
     expect(response.statusCode).toBe(400);
   });
 });
 
-describe("POST /sessions/refresh", () => {
+describe("POST /v1/sessions/refresh", () => {
   it("answers a new pair", async () => {
     await createUser();
     const { body } = await loginAs();
 
     const response = await app.inject({
       method: "POST",
-      url: "/sessions/refresh",
+      url: "/v1/sessions/refresh",
       payload: { refreshToken: body.refreshToken },
     });
 
@@ -1786,11 +1797,11 @@ describe("POST /sessions/refresh", () => {
   it("answers 401 for a token that was already rotated", async () => {
     await createUser();
     const { body } = await loginAs();
-    await app.inject({ method: "POST", url: "/sessions/refresh", payload: { refreshToken: body.refreshToken } });
+    await app.inject({ method: "POST", url: "/v1/sessions/refresh", payload: { refreshToken: body.refreshToken } });
 
     const response = await app.inject({
       method: "POST",
-      url: "/sessions/refresh",
+      url: "/v1/sessions/refresh",
       payload: { refreshToken: body.refreshToken },
     });
 
@@ -1798,43 +1809,47 @@ describe("POST /sessions/refresh", () => {
   });
 });
 
-describe("DELETE /sessions", () => {
+describe("POST /v1/sessions/signout", () => {
   it("revokes the refresh token presented", async () => {
     await createUser();
     const { body } = await loginAs();
 
-    const logout = await app.inject({
-      method: "DELETE",
-      url: "/sessions",
+    const signout = await app.inject({
+      method: "POST",
+      url: "/v1/sessions/signout",
       headers: { authorization: `Bearer ${body.accessToken}` },
       payload: { refreshToken: body.refreshToken },
     });
 
     const refresh = await app.inject({
       method: "POST",
-      url: "/sessions/refresh",
+      url: "/v1/sessions/refresh",
       payload: { refreshToken: body.refreshToken },
     });
 
-    expect(logout.statusCode).toBe(204);
+    expect(signout.statusCode).toBe(204);
     expect(refresh.statusCode).toBe(401);
   });
 
   it("answers 401 without an access token", async () => {
-    const response = await app.inject({ method: "DELETE", url: "/sessions", payload: { refreshToken: "whatever" } });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/sessions/signout",
+      payload: { refreshToken: "whatever" },
+    });
 
     expect(response.statusCode).toBe(401);
   });
 });
 
-describe("GET /me", () => {
+describe("GET /v1/sessions/me", () => {
   it("answers the current user and the permission the role and the extras add up to", async () => {
     const user = await createUser();
     const { body } = await loginAs();
 
     const response = await app.inject({
       method: "GET",
-      url: "/me",
+      url: "/v1/sessions/me",
       headers: { authorization: `Bearer ${body.accessToken}` },
     });
 
@@ -1856,7 +1871,7 @@ describe("GET /me", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/me",
+      url: "/v1/sessions/me",
       headers: { authorization: `Bearer ${body.accessToken}` },
     });
 
@@ -1864,9 +1879,9 @@ describe("GET /me", () => {
   });
 });
 
-describe("GET /health", () => {
+describe("GET /v1/health", () => {
   it("answers without a token", async () => {
-    expect((await app.inject({ method: "GET", url: "/health" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/v1/health" })).statusCode).toBe(200);
   });
 });
 ```
@@ -1874,7 +1889,7 @@ describe("GET /health", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npm run test:integration`
-Expected: FAIL — `POST /sessions` responde 404, porque a rota não existe.
+Expected: FAIL — `POST /v1/sessions/signin` responde 404, porque a rota não existe.
 
 - [ ] **Step 3: Write the schemas**
 
@@ -1933,7 +1948,7 @@ export default async function authRoutes(app: FastifyInstance) {
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
   typed.post(
-    "/sessions",
+    "/sessions/signin",
     {
       config: { auth: PUBLIC },
       schema: {
@@ -1974,8 +1989,8 @@ export default async function authRoutes(app: FastifyInstance) {
     },
   );
 
-  typed.delete(
-    "/sessions",
+  typed.post(
+    "/sessions/signout",
     {
       config: { auth: AUTHENTICATED },
       schema: {
@@ -1993,7 +2008,7 @@ export default async function authRoutes(app: FastifyInstance) {
   );
 
   typed.get(
-    "/me",
+    "/sessions/me",
     {
       config: { auth: AUTHENTICATED },
       schema: {
@@ -2083,7 +2098,7 @@ git commit -m "feat(auth): close the API behind sessions and expose the current 
 **Interfaces:**
 
 - Consumes: `Env.CORS_ORIGINS` (Task 3), as rotas da Task 10.
-- Produces: `POST /sessions` responde `429` depois de cinco tentativas por minuto para o mesmo par IP e username.
+- Produces: `POST /v1/sessions/signin` responde `429` depois de cinco tentativas por minuto para o mesmo par IP e username.
 
 - [ ] **Step 1: Install the dependency**
 
@@ -2104,7 +2119,7 @@ import { startTestApp } from "../../support/app.js";
 let app: FastifyInstance;
 
 const attemptLogin = (username: string) =>
-  app.inject({ method: "POST", url: "/sessions", payload: { username, password: "wrong" } });
+  app.inject({ method: "POST", url: "/v1/sessions/signin", payload: { username, password: "wrong" } });
 
 beforeAll(async () => {
   app = await startTestApp();
@@ -2119,7 +2134,7 @@ afterAll(async () => {
   await testPrisma.$disconnect();
 });
 
-describe("POST /sessions rate limit", () => {
+describe("POST /v1/sessions/signin rate limit", () => {
   it("answers 429 once the attempts for one username run out", async () => {
     const codes: number[] = [];
 
@@ -2162,7 +2177,7 @@ com `import fastifyRateLimit from "@fastify/rate-limit";` no topo. `global: fals
 
 - [ ] **Step 5: Limit the login route**
 
-Em `src/modules/auth/auth.routes.ts`, acrescente a configuração à rota `POST /sessions`, ao lado de `auth: PUBLIC`:
+Em `src/modules/auth/auth.routes.ts`, acrescente a configuração à rota `POST /sessions/signin`, ao lado de `auth: PUBLIC`:
 
 ```ts
 config: {
@@ -2244,7 +2259,7 @@ Expected: PASS, com `1 snapshot written`.
 
 - [ ] **Step 3: Read the snapshot**
 
-Abra `tests/__snapshots__/routes-inventory.integration.test.ts.snap` e confira à mão que cada rota da Fase 1 aparece com o acesso que o spec manda: `/sessions` e `/sessions/refresh` públicas, `DELETE /sessions` e `/me` autenticadas, `/health` pública.
+Abra `tests/__snapshots__/routes-inventory.integration.test.ts.snap` e confira à mão que cada rota da Fase 1 aparece com o acesso que o spec manda: `/v1/sessions/signin` e `/v1/sessions/refresh` públicas, `/v1/sessions/signout` e `/v1/sessions/me` autenticadas, `/v1/health` pública.
 
 - [ ] **Step 4: Commit**
 
@@ -2269,7 +2284,8 @@ Corpo do PR, exatamente neste formato:
 - scrypt password hashing — store credentials without a native dependency
 - access and refresh tokens — short-lived JWT plus a rotating opaque token with reuse detection
 - per-route access declaration — the application refuses to start with an undeclared route
-- session routes and /me — login, refresh, logout and the current user
+- versioned route prefix — every route served under /v1, applied in one place
+- session routes and /v1/sessions/me — signin, refresh, signout and the current user
 - login rate limit and environment-driven CORS — close brute force and the wildcard origin
 - integration test setup — run the built application against an isolated database schema
 
@@ -2299,7 +2315,7 @@ Branch: `feat/access-administration`, a partir da `main` já com a Fase 1 mescla
 **Interfaces:**
 
 - Consumes: `Permission` (Task 1), `prisma`, o controle de acesso da Task 8, e o helper de autenticação dos testes.
-- Produces: `GET /roles`, `POST /roles`, `PATCH /roles/:id`, `DELETE /roles/:id`, e `authenticateAs(app, permissions)` em `tests/support/app.ts`.
+- Produces: `GET /v1/roles`, `POST /v1/roles`, `PATCH /v1/roles/:id`, `DELETE /v1/roles/:id`, e `authenticateAs(app, permissions)` em `tests/support/app.ts`.
 
 - [ ] **Step 1: Extend the test helper**
 
@@ -2328,7 +2344,7 @@ export async function authenticateAs(
 
   const response = await app.inject({
     method: "POST",
-    url: "/sessions",
+    url: "/v1/sessions/signin",
     payload: { username, password: "correct horse battery" },
   });
 
@@ -2362,13 +2378,13 @@ afterAll(async () => {
   await testPrisma.$disconnect();
 });
 
-describe("POST /roles", () => {
+describe("POST /v1/roles", () => {
   it("creates a role with the permissions it was given", async () => {
     const { headers } = await authenticateAs(app, [Permission.ACCESS_CREATE]);
 
     const response = await app.inject({
       method: "POST",
-      url: "/roles",
+      url: "/v1/roles",
       headers,
       payload: { name: "Seller", permissions: [Permission.SALES_READ, Permission.SALES_CREATE] },
     });
@@ -2382,7 +2398,7 @@ describe("POST /roles", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/roles",
+      url: "/v1/roles",
       headers,
       payload: { name: "Seller", permissions: [] },
     });
@@ -2396,7 +2412,7 @@ describe("POST /roles", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/roles",
+      url: "/v1/roles",
       headers,
       payload: { name: "Seller", permissions: [] },
     });
@@ -2409,7 +2425,7 @@ describe("POST /roles", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/roles",
+      url: "/v1/roles",
       headers,
       payload: { name: "Seller", permissions: ["SALES_DESTROY"] },
     });
@@ -2418,7 +2434,7 @@ describe("POST /roles", () => {
   });
 });
 
-describe("GET /roles", () => {
+describe("GET /v1/roles", () => {
   it("lists the roles in alphabetical order", async () => {
     const { headers } = await authenticateAs(app, [Permission.ACCESS_READ]);
     await testPrisma.role.createMany({
@@ -2428,24 +2444,24 @@ describe("GET /roles", () => {
       ],
     });
 
-    const response = await app.inject({ method: "GET", url: "/roles", headers });
+    const response = await app.inject({ method: "GET", url: "/v1/roles", headers });
 
     expect(response.json().map((role: { name: string }) => role.name)).toEqual(["Seller", "Stocker"]);
   });
 
   it("answers 401 without a token", async () => {
-    expect((await app.inject({ method: "GET", url: "/roles" })).statusCode).toBe(401);
+    expect((await app.inject({ method: "GET", url: "/v1/roles" })).statusCode).toBe(401);
   });
 });
 
-describe("PATCH /roles/:id", () => {
+describe("PATCH /v1/roles/:id", () => {
   it("replaces the permission package", async () => {
     const { headers } = await authenticateAs(app, [Permission.ACCESS_UPDATE]);
     const role = await testPrisma.role.create({ data: { name: "Seller", permissions: ["SALES_READ"] } });
 
     const response = await app.inject({
       method: "PATCH",
-      url: `/roles/${role.id}`,
+      url: `/v1/roles/${role.id}`,
       headers,
       payload: { permissions: [Permission.REPORTS_READ] },
     });
@@ -2459,7 +2475,7 @@ describe("PATCH /roles/:id", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: "/roles/0199a1f0-0000-7000-8000-0000000000ff",
+      url: "/v1/roles/0199a1f0-0000-7000-8000-0000000000ff",
       headers,
       payload: { permissions: [] },
     });
@@ -2468,7 +2484,7 @@ describe("PATCH /roles/:id", () => {
   });
 });
 
-describe("DELETE /roles/:id", () => {
+describe("DELETE /v1/roles/:id", () => {
   it("removes the role and leaves its users without inheritance", async () => {
     const { headers } = await authenticateAs(app, [Permission.ACCESS_UPDATE]);
     const role = await testPrisma.role.create({ data: { name: "Seller", permissions: ["SALES_READ"] } });
@@ -2476,7 +2492,7 @@ describe("DELETE /roles/:id", () => {
       data: { name: "Someone", username: "someone", passwordHash: "x", roleId: role.id },
     });
 
-    const response = await app.inject({ method: "DELETE", url: `/roles/${role.id}`, headers });
+    const response = await app.inject({ method: "DELETE", url: `/v1/roles/${role.id}`, headers });
 
     expect(response.statusCode).toBe(204);
     expect((await testPrisma.user.findUnique({ where: { id: user.id } }))?.roleId).toBeNull();
@@ -2685,7 +2701,7 @@ git commit -m "feat(roles): administer the named permission packages"
 **Interfaces:**
 
 - Consumes: `hashPassword` (Task 5), `findUserById`, `findUserByUsername` e `revokeAllRefreshTokens` (Task 9), `effectivePermissions` (Task 4), `findRoleById` (Task 13).
-- Produces: `GET /users`, `POST /users`, `GET /users/:id`, `PATCH /users/:id`.
+- Produces: `GET /v1/users`, `POST /v1/users`, `GET /v1/users/:id`, `PATCH /v1/users/:id`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2713,13 +2729,13 @@ afterAll(async () => {
   await testPrisma.$disconnect();
 });
 
-describe("POST /users", () => {
+describe("POST /v1/users", () => {
   it("creates a user and never answers the password back", async () => {
     const { headers } = await authenticateAs(app, [Permission.ACCESS_CREATE], "admin");
 
     const response = await app.inject({
       method: "POST",
-      url: "/users",
+      url: "/v1/users",
       headers,
       payload: { name: "New Person", username: "newbie", password: "a-good-password" },
     });
@@ -2735,7 +2751,7 @@ describe("POST /users", () => {
 
     await app.inject({
       method: "POST",
-      url: "/users",
+      url: "/v1/users",
       headers,
       payload: { name: "New Person", username: "newbie", password: "a-good-password" },
     });
@@ -2750,7 +2766,7 @@ describe("POST /users", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/users",
+      url: "/v1/users",
       headers,
       payload: { name: "Impostor", username: "admin", password: "a-good-password" },
     });
@@ -2763,7 +2779,7 @@ describe("POST /users", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/users",
+      url: "/v1/users",
       headers,
       payload: { name: "New Person", username: "newbie", password: "short" },
     });
@@ -2772,7 +2788,7 @@ describe("POST /users", () => {
   });
 });
 
-describe("GET /users/:id", () => {
+describe("GET /v1/users/:id", () => {
   it("answers the effective permission alongside the record", async () => {
     const { headers } = await authenticateAs(app, [Permission.ACCESS_READ], "admin");
     const role = await testPrisma.role.create({ data: { name: "Seller", permissions: ["SALES_READ"] } });
@@ -2786,7 +2802,7 @@ describe("GET /users/:id", () => {
       },
     });
 
-    const response = await app.inject({ method: "GET", url: `/users/${user.id}`, headers });
+    const response = await app.inject({ method: "GET", url: `/v1/users/${user.id}`, headers });
 
     expect(response.statusCode).toBe(200);
     expect(response.json().permissions.sort()).toEqual(["REPORTS_READ", "SALES_READ"]);
@@ -2797,7 +2813,7 @@ describe("GET /users/:id", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/users/0199a1f0-0000-7000-8000-0000000000ff",
+      url: "/v1/users/0199a1f0-0000-7000-8000-0000000000ff",
       headers,
     });
 
@@ -2805,7 +2821,7 @@ describe("GET /users/:id", () => {
   });
 });
 
-describe("PATCH /users/:id", () => {
+describe("PATCH /v1/users/:id", () => {
   it("assigns a role", async () => {
     const { headers } = await authenticateAs(app, [Permission.ACCESS_UPDATE], "admin");
     const role = await testPrisma.role.create({ data: { name: "Seller", permissions: ["SALES_READ"] } });
@@ -2815,7 +2831,7 @@ describe("PATCH /users/:id", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: `/users/${user.id}`,
+      url: `/v1/users/${user.id}`,
       headers,
       payload: { roleId: role.id },
     });
@@ -2832,7 +2848,7 @@ describe("PATCH /users/:id", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: `/users/${user.id}`,
+      url: `/v1/users/${user.id}`,
       headers,
       payload: { roleId: "0199a1f0-0000-7000-8000-0000000000ff" },
     });
@@ -2846,7 +2862,7 @@ describe("PATCH /users/:id", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: `/users/${target.userId}`,
+      url: `/v1/users/${target.userId}`,
       headers,
       payload: { isActive: false },
     });
@@ -2855,7 +2871,7 @@ describe("PATCH /users/:id", () => {
 
     expect(response.statusCode).toBe(200);
     expect(survivors).toBe(0);
-    expect((await app.inject({ method: "GET", url: "/me", headers: target.headers })).statusCode).toBe(401);
+    expect((await app.inject({ method: "GET", url: "/v1/sessions/me", headers: target.headers })).statusCode).toBe(401);
   });
 
   it("answers 403 without ACCESS_UPDATE", async () => {
@@ -2866,7 +2882,7 @@ describe("PATCH /users/:id", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: `/users/${user.id}`,
+      url: `/v1/users/${user.id}`,
       headers,
       payload: { isActive: false },
     });
@@ -2875,11 +2891,11 @@ describe("PATCH /users/:id", () => {
   });
 });
 
-describe("GET /users", () => {
+describe("GET /v1/users", () => {
   it("lists users without any password material", async () => {
     const { headers } = await authenticateAs(app, [Permission.ACCESS_READ], "admin");
 
-    const response = await app.inject({ method: "GET", url: "/users", headers });
+    const response = await app.inject({ method: "GET", url: "/v1/users", headers });
 
     expect(response.statusCode).toBe(200);
     expect(JSON.stringify(response.json())).not.toContain("scrypt$");
@@ -2925,11 +2941,20 @@ export function updateUser(
 ) {
   return prisma.user.update({ where: { id }, data: input, ...WITH_ROLE });
 }
+```
 
+A escrita do hash de senha **não** entra aqui: pela Decisão 4 a senha é assunto de `auth`, e a
+rota que troca a própria senha vive em `auth.routes.ts`. Acrescente a
+`src/modules/auth/auth.repository.ts`:
+
+```ts
 export async function updatePasswordHash(id: string, passwordHash: string): Promise<void> {
   await prisma.user.update({ where: { id }, data: { passwordHash } });
 }
 ```
+
+`users` já importa `findUserById` de `auth.repository.ts`; guardar a senha do outro lado inverteria
+a seta e faria `auth` depender de `users`.
 
 - [ ] **Step 4: Write the schemas**
 
@@ -3119,25 +3144,31 @@ git commit -m "feat(users): administer accounts, roles and individual permission
 
 ### Task 15: Troca de senha
 
+Dois casos, dois módulos. A troca da própria senha é do "eu autenticado" e mora em
+`/v1/sessions/me/password`, dentro de `auth`. O reset feito por administrador é operação de cadastro
+e mora em `/v1/users/:id/password`, dentro de `users`.
+
 **Files:**
 
+- Modify: `src/modules/auth/auth.schemas.ts`
+- Modify: `src/modules/auth/auth.routes.ts`
 - Modify: `src/modules/users/users.schemas.ts`
 - Modify: `src/modules/users/users.routes.ts`
+- Test: `tests/modules/auth/auth.me-password.integration.test.ts`
 - Test: `tests/modules/users/users.password.integration.test.ts`
 
 **Interfaces:**
 
-- Consumes: `hashPassword`, `verifyPassword` (Task 5), `updatePasswordHash` (Task 14), `revokeAllRefreshTokens` (Task 9).
-- Produces: `PATCH /me/password` e `PATCH /users/:id/password`.
+- Consumes: `hashPassword`, `verifyPassword` (Task 5), `updatePasswordHash` (Task 14), `revokeAllRefreshTokens` (Task 9), `authenticateAs` (Task 13).
+- Produces: `PATCH /v1/sessions/me/password` e `PATCH /v1/users/:id/password`.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
 
-Crie `tests/modules/users/users.password.integration.test.ts`:
+Crie `tests/modules/auth/auth.me-password.integration.test.ts`:
 
 ```ts
 import { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { Permission } from "../../../src/generated/prisma/index.js";
 import { verifyPassword } from "../../../src/modules/auth/auth.password.js";
 import { authenticateAs, startTestApp } from "../../support/app.js";
 import { resetDatabase, testPrisma } from "../../support/database.js";
@@ -3160,13 +3191,13 @@ afterAll(async () => {
   await testPrisma.$disconnect();
 });
 
-describe("PATCH /me/password", () => {
+describe("PATCH /v1/sessions/me/password", () => {
   it("replaces the password and ends every session, including the one that asked", async () => {
     const { userId, headers } = await authenticateAs(app, []);
 
     const response = await app.inject({
       method: "PATCH",
-      url: "/me/password",
+      url: "/v1/sessions/me/password",
       headers,
       payload: { currentPassword: CURRENT, newPassword: NEXT },
     });
@@ -3184,7 +3215,7 @@ describe("PATCH /me/password", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: "/me/password",
+      url: "/v1/sessions/me/password",
       headers,
       payload: { currentPassword: "not-my-password", newPassword: NEXT },
     });
@@ -3200,7 +3231,7 @@ describe("PATCH /me/password", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: "/me/password",
+      url: "/v1/sessions/me/password",
       headers,
       payload: { currentPassword: CURRENT, newPassword: "short" },
     });
@@ -3208,15 +3239,43 @@ describe("PATCH /me/password", () => {
     expect(response.statusCode).toBe(400);
   });
 });
+```
 
-describe("PATCH /users/:id/password", () => {
+Crie `tests/modules/users/users.password.integration.test.ts`:
+
+```ts
+import { FastifyInstance } from "fastify";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { Permission } from "../../../src/generated/prisma/index.js";
+import { verifyPassword } from "../../../src/modules/auth/auth.password.js";
+import { authenticateAs, startTestApp } from "../../support/app.js";
+import { resetDatabase, testPrisma } from "../../support/database.js";
+
+const NEXT = "an-even-better-password";
+
+let app: FastifyInstance;
+
+beforeAll(async () => {
+  app = await startTestApp();
+});
+
+afterEach(async () => {
+  await resetDatabase();
+});
+
+afterAll(async () => {
+  await app.close();
+  await testPrisma.$disconnect();
+});
+
+describe("PATCH /v1/users/:id/password", () => {
   it("resets another person's password without asking for the old one", async () => {
     const { headers } = await authenticateAs(app, [Permission.ACCESS_UPDATE], "admin");
     const target = await authenticateAs(app, [], "target");
 
     const response = await app.inject({
       method: "PATCH",
-      url: `/users/${target.userId}/password`,
+      url: `/v1/users/${target.userId}/password`,
       headers,
       payload: { newPassword: NEXT },
     });
@@ -3225,7 +3284,7 @@ describe("PATCH /users/:id/password", () => {
 
     expect(response.statusCode).toBe(204);
     expect(await verifyPassword(NEXT, stored!.passwordHash)).toBe(true);
-    expect((await app.inject({ method: "GET", url: "/me", headers: target.headers })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/v1/sessions/me", headers: target.headers })).statusCode).toBe(200);
     expect(await testPrisma.refreshToken.count({ where: { userId: target.userId, revokedAt: null } })).toBe(0);
   });
 
@@ -3235,7 +3294,7 @@ describe("PATCH /users/:id/password", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: `/users/${target.userId}/password`,
+      url: `/v1/users/${target.userId}/password`,
       headers,
       payload: { newPassword: NEXT },
     });
@@ -3247,37 +3306,41 @@ describe("PATCH /users/:id/password", () => {
 
 O access token do alvo continua valendo por até quinze minutos depois do reset; o que a troca corta é o refresh, e é por isso que o teste checa a contagem de tokens vivos em vez de esperar 401 imediato.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npm run test:integration -- tests/modules/users/users.password.integration.test.ts`
+Run: `npm run test:integration -- tests/modules/auth/auth.me-password.integration.test.ts tests/modules/users/users.password.integration.test.ts`
 Expected: FAIL — as rotas respondem 404.
 
 - [ ] **Step 3: Write the schemas**
 
-Acrescente a `src/modules/users/users.schemas.ts`:
+Acrescente a `src/modules/auth/auth.schemas.ts`:
 
 ```ts
 export const changeOwnPasswordBodySchema = z.object({
   currentPassword: z.string().min(1),
   newPassword: z.string().min(8),
 });
+```
 
+Acrescente a `src/modules/users/users.schemas.ts`:
+
+```ts
 export const resetPasswordBodySchema = z.object({
   newPassword: z.string().min(8),
 });
 ```
 
-- [ ] **Step 4: Write the routes**
+- [ ] **Step 4: Write the route for one's own password**
 
-Acrescente as duas rotas em `src/modules/users/users.routes.ts`, dentro de `usersRoutes`:
+Acrescente em `src/modules/auth/auth.routes.ts`, dentro de `authRoutes`:
 
 ```ts
 typed.patch(
-  "/me/password",
+  "/sessions/me/password",
   {
     config: { auth: AUTHENTICATED },
     schema: {
-      tags: ["users"],
+      tags: ["auth"],
       summary: "Troca a própria senha",
       body: changeOwnPasswordBodySchema,
       response: { 204: z.void(), 401: messageSchema },
@@ -3287,7 +3350,7 @@ typed.patch(
     const user = await findUserById(request.currentUser!.id);
     const matches = await verifyPassword(request.body.currentPassword, user!.passwordHash);
 
-    if (!matches) return reply.code(401).send({ message: "Invalid credentials." });
+    if (!matches) return reply.code(401).send(INVALID_CREDENTIALS);
 
     await updatePasswordHash(user!.id, await hashPassword(request.body.newPassword));
 
@@ -3298,7 +3361,15 @@ typed.patch(
     return reply.code(204).send();
   },
 );
+```
 
+Acrescente aos imports do arquivo: `hashPassword` e `verifyPassword` de `./auth.password.js`, `updatePasswordHash` e `revokeAllRefreshTokens` de `./auth.repository.js`, e `changeOwnPasswordBodySchema` de `./auth.schemas.js`. `findUserById`, `AUTHENTICATED`, `messageSchema` e `INVALID_CREDENTIALS` já estão no arquivo desde a Task 10.
+
+- [ ] **Step 5: Write the route for the administrator's reset**
+
+Acrescente em `src/modules/users/users.routes.ts`, dentro de `usersRoutes`:
+
+```ts
 typed.patch(
   "/users/:id/password",
   {
@@ -3324,19 +3395,19 @@ typed.patch(
 );
 ```
 
-Acrescente aos imports do arquivo: `AUTHENTICATED` de `../auth/auth.access.js`, `verifyPassword` de `../auth/auth.password.js`, `updatePasswordHash` de `./users.repository.js`, e `changeOwnPasswordBodySchema` e `resetPasswordBodySchema` de `./users.schemas.js`. `findUserById` já vem de `../auth/auth.repository.js` desde a Task 14, e é o mesmo aqui.
+Acrescente aos imports do arquivo: `hashPassword` de `../auth/auth.password.js`, `updatePasswordHash` e `revokeAllRefreshTokens` de `../auth/auth.repository.js`, e `resetPasswordBodySchema` de `./users.schemas.js`. `findUserById` já vem de `../auth/auth.repository.js` desde a Task 14.
 
-- [ ] **Step 5: Run test to verify it passes**
+- [ ] **Step 6: Run tests to verify they pass**
 
 Run: `npm run test:integration`
 Expected: PASS. Atualize o snapshot de rotas depois de conferir as duas linhas novas.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 npm run typecheck && npx prettier --check .
 git add src tests
-git commit -m "feat(users): change and reset passwords, ending the affected sessions"
+git commit -m "feat(auth): change and reset passwords, ending the affected sessions"
 ```
 
 ### Task 16: Seed do usuário inicial
@@ -3504,7 +3575,7 @@ npm run dev
 Em outro terminal:
 
 ```bash
-curl -s -X POST http://localhost:3333/sessions -H 'Content-Type: application/json' \
+curl -s -X POST http://localhost:3333/v1/sessions/signin -H 'Content-Type: application/json' \
   -d '{"username":"owner","password":"change-me-on-the-first-login"}'
 ```
 

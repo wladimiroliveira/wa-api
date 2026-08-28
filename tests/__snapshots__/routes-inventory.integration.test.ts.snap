@@ -1,0 +1,11 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`routes inventory > matches the recorded access of every route 1`] = `
+"GET /v1/health -> public
+GET /v1/sessions/me -> authenticated
+HEAD /v1/health -> public
+HEAD /v1/sessions/me -> authenticated
+POST /v1/sessions/refresh -> public
+POST /v1/sessions/signin -> public
+POST /v1/sessions/signout -> authenticated"
+`;
