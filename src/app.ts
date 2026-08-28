@@ -3,6 +3,7 @@ import routes from "./routes.js";
 import { fastifySwagger } from "@fastify/swagger";
 import { fastifySwaggerUi } from "@fastify/swagger-ui";
 import { fastifyCors } from "@fastify/cors";
+import fastifyRateLimit from "@fastify/rate-limit";
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform, ZodTypeProvider } from "fastify-type-provider-zod";
 import { loadEnv } from "./lib/env.js";
 import { registerAccessToken } from "./modules/auth/auth.jwt.js";
@@ -15,10 +16,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.setSerializerCompiler(serializerCompiler);
 
   await app.register(fastifyCors, {
-    origin: ["*"],
-    methods: ["GET", "POST", "PATCH"],
+    origin: env.CORS_ORIGINS,
+    methods: ["GET", "POST", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   });
+
+  // Not global: the limit applies only where a route asks for it.
+  await app.register(fastifyRateLimit, { global: false });
 
   await app.register(fastifySwagger, {
     openapi: {

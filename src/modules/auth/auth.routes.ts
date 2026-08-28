@@ -1,4 +1,4 @@
-import { FastifyInstance } from "fastify";
+import { FastifyInstance, FastifyRequest } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { AUTHENTICATED, PUBLIC } from "./auth.access.js";
@@ -20,7 +20,22 @@ export default async function authRoutes(app: FastifyInstance) {
   typed.post(
     "/sessions",
     {
-      config: { auth: PUBLIC },
+      config: {
+        auth: PUBLIC,
+        rateLimit: {
+          max: 5,
+          timeWindow: "1 minute",
+          // The hook runs after the body is parsed so the key can include the username: limiting by
+          // IP alone lets one office share the budget, and by username alone lets one IP sweep every
+          // account.
+          hook: "preHandler",
+          keyGenerator: (request: FastifyRequest) => {
+            const body = request.body as { username?: string } | null;
+
+            return `${request.ip}:${body?.username ?? ""}`;
+          },
+        },
+      },
       schema: {
         tags: ["auth"],
         summary: "Autentica e devolve o par de tokens",

@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { hashPassword } from "../../../src/modules/auth/auth.password.js";
 import { resetDatabase, testPrisma } from "../../support/database.js";
 import { startTestApp } from "../../support/app.js";
@@ -28,16 +28,18 @@ async function loginAs(username = "tester", password = PASSWORD) {
   return { statusCode: response.statusCode, body: response.json() };
 }
 
-beforeAll(async () => {
+// A fresh application per case, not per file: the login rate limiter keeps its counters in the
+// instance, and a budget shared between cases would make one test fail because of another.
+beforeEach(async () => {
   app = await startTestApp();
 });
 
 afterEach(async () => {
+  await app.close();
   await resetDatabase();
 });
 
 afterAll(async () => {
-  await app.close();
   await testPrisma.$disconnect();
 });
 
