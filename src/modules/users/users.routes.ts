@@ -2,13 +2,24 @@ import { FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { Permission, Role, User } from "../../generated/prisma/index.js";
-import { findUserById, findUserByUsername, revokeAllRefreshTokens } from "../auth/auth.repository.js";
+import {
+  findUserById,
+  findUserByUsername,
+  revokeAllRefreshTokens,
+  updatePasswordHash,
+} from "../auth/auth.repository.js";
 import { hashPassword } from "../auth/auth.password.js";
 import { effectivePermissions } from "../auth/auth.permissions.js";
 import { messageSchema } from "../auth/auth.schemas.js";
 import { findRoleById } from "../roles/roles.repository.js";
 import { insertUser, listUsers, updateUser } from "./users.repository.js";
-import { createUserBodySchema, updateUserBodySchema, userIdParamsSchema, userSchema } from "./users.schemas.js";
+import {
+  createUserBodySchema,
+  resetPasswordBodySchema,
+  updateUserBodySchema,
+  userIdParamsSchema,
+  userSchema,
+} from "./users.schemas.js";
 
 type UserWithRole = User & { role: Role | null };
 
@@ -115,6 +126,30 @@ export default async function usersRoutes(app: FastifyInstance) {
       if (request.body.isActive === false) await revokeAllRefreshTokens(user.id);
 
       return reply.send(present(updated));
+    },
+  );
+
+  typed.patch(
+    "/users/:id/password",
+    {
+      config: { auth: Permission.ACCESS_UPDATE },
+      schema: {
+        tags: ["users"],
+        summary: "Reseta a senha de outro usuário",
+        params: userIdParamsSchema,
+        body: resetPasswordBodySchema,
+        response: { 204: z.void(), 404: messageSchema },
+      },
+    },
+    async (request, reply) => {
+      const user = await findUserById(request.params.id);
+
+      if (user === null) return reply.code(404).send({ message: "User not found." });
+
+      await updatePasswordHash(user.id, await hashPassword(request.body.newPassword));
+      await revokeAllRefreshTokens(user.id);
+
+      return reply.code(204).send();
     },
   );
 }

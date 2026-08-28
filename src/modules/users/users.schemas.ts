@@ -35,3 +35,7 @@ export const updateUserBodySchema = z
   .refine((body) => Object.keys(body).length > 0, { message: "Nothing to update." });
 
 export const userIdParamsSchema = z.object({ id: z.uuid() });
+
+export const resetPasswordBodySchema = z.object({
+  newPassword: z.string().min(8),
+});

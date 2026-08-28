@@ -2,9 +2,11 @@ import { FastifyInstance, FastifyRequest } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { AUTHENTICATED, PUBLIC } from "./auth.access.js";
-import { findUserById } from "./auth.repository.js";
+import { hashPassword, verifyPassword } from "./auth.password.js";
+import { findUserById, revokeAllRefreshTokens, updatePasswordHash } from "./auth.repository.js";
 import { login, logout, refreshSession } from "./auth.service.js";
 import {
+  changeOwnPasswordBodySchema,
   currentUserSchema,
   loginBodySchema,
   messageSchema,
@@ -113,6 +115,33 @@ export default async function authRoutes(app: FastifyInstance) {
         roleId: user!.roleId,
         permissions: current.permissions,
       });
+    },
+  );
+
+  typed.patch(
+    "/sessions/me/password",
+    {
+      config: { auth: AUTHENTICATED },
+      schema: {
+        tags: ["auth"],
+        summary: "Troca a própria senha",
+        body: changeOwnPasswordBodySchema,
+        response: { 204: z.void(), 401: messageSchema },
+      },
+    },
+    async (request, reply) => {
+      const user = await findUserById(request.currentUser!.id);
+      const matches = await verifyPassword(request.body.currentPassword, user!.passwordHash);
+
+      if (!matches) return reply.code(401).send(INVALID_CREDENTIALS);
+
+      await updatePasswordHash(user!.id, await hashPassword(request.body.newPassword));
+
+      // Every session goes, this one included. A refresh token stolen before the change would
+      // otherwise outlive it, and the change would have solved nothing.
+      await revokeAllRefreshTokens(user!.id);
+
+      return reply.code(204).send();
     },
   );
 }

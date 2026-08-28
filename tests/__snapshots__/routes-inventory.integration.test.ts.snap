@@ -13,7 +13,9 @@ HEAD /v1/sessions/me -> authenticated
 HEAD /v1/users -> ACCESS_READ
 HEAD /v1/users/:id -> ACCESS_READ
 PATCH /v1/roles/:id -> ACCESS_UPDATE
+PATCH /v1/sessions/me/password -> authenticated
 PATCH /v1/users/:id -> ACCESS_UPDATE
+PATCH /v1/users/:id/password -> ACCESS_UPDATE
 POST /v1/roles -> ACCESS_CREATE
 POST /v1/sessions/refresh -> public
 POST /v1/sessions/signin -> public
