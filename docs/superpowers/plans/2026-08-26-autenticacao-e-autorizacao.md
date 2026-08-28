@@ -1708,7 +1708,7 @@ Crie `tests/modules/auth/auth.routes.integration.test.ts`:
 
 ```ts
 import { FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { hashPassword } from "../../../src/modules/auth/auth.password.js";
 import { resetDatabase, testPrisma } from "../../support/database.js";
 import { startTestApp } from "../../support/app.js";
@@ -1737,16 +1737,18 @@ async function loginAs(username = "tester", password = PASSWORD) {
   return { statusCode: response.statusCode, body: response.json() };
 }
 
-beforeAll(async () => {
+// A fresh application per case, not per file: the login rate limiter keeps its counters in the
+// instance, and authenticateAs signs in with the same username in every case.
+beforeEach(async () => {
   app = await startTestApp();
 });
 
 afterEach(async () => {
+  await app.close();
   await resetDatabase();
 });
 
 afterAll(async () => {
-  await app.close();
   await testPrisma.$disconnect();
 });
 
@@ -2112,7 +2114,7 @@ Crie `tests/modules/auth/auth.rate-limit.integration.test.ts`:
 
 ```ts
 import { FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetDatabase, testPrisma } from "../../support/database.js";
 import { startTestApp } from "../../support/app.js";
 
@@ -2121,16 +2123,18 @@ let app: FastifyInstance;
 const attemptLogin = (username: string) =>
   app.inject({ method: "POST", url: "/v1/sessions/signin", payload: { username, password: "wrong" } });
 
-beforeAll(async () => {
+// A fresh application per case, not per file: the login rate limiter keeps its counters in the
+// instance, and authenticateAs signs in with the same username in every case.
+beforeEach(async () => {
   app = await startTestApp();
 });
 
 afterEach(async () => {
+  await app.close();
   await resetDatabase();
 });
 
 afterAll(async () => {
-  await app.close();
   await testPrisma.$disconnect();
 });
 
@@ -2358,23 +2362,25 @@ Crie `tests/modules/roles/roles.routes.integration.test.ts`:
 
 ```ts
 import { FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Permission } from "../../../src/generated/prisma/index.js";
 import { authenticateAs, startTestApp } from "../../support/app.js";
 import { resetDatabase, testPrisma } from "../../support/database.js";
 
 let app: FastifyInstance;
 
-beforeAll(async () => {
+// A fresh application per case, not per file: the login rate limiter keeps its counters in the
+// instance, and authenticateAs signs in with the same username in every case.
+beforeEach(async () => {
   app = await startTestApp();
 });
 
 afterEach(async () => {
+  await app.close();
   await resetDatabase();
 });
 
 afterAll(async () => {
-  await app.close();
   await testPrisma.$disconnect();
 });
 
@@ -2709,23 +2715,25 @@ Crie `tests/modules/users/users.routes.integration.test.ts`:
 
 ```ts
 import { FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Permission } from "../../../src/generated/prisma/index.js";
 import { authenticateAs, startTestApp } from "../../support/app.js";
 import { resetDatabase, testPrisma } from "../../support/database.js";
 
 let app: FastifyInstance;
 
-beforeAll(async () => {
+// A fresh application per case, not per file: the login rate limiter keeps its counters in the
+// instance, and authenticateAs signs in with the same username in every case.
+beforeEach(async () => {
   app = await startTestApp();
 });
 
 afterEach(async () => {
+  await app.close();
   await resetDatabase();
 });
 
 afterAll(async () => {
-  await app.close();
   await testPrisma.$disconnect();
 });
 
@@ -3168,7 +3176,7 @@ Crie `tests/modules/auth/auth.me-password.integration.test.ts`:
 
 ```ts
 import { FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { verifyPassword } from "../../../src/modules/auth/auth.password.js";
 import { authenticateAs, startTestApp } from "../../support/app.js";
 import { resetDatabase, testPrisma } from "../../support/database.js";
@@ -3178,16 +3186,18 @@ const NEXT = "an-even-better-password";
 
 let app: FastifyInstance;
 
-beforeAll(async () => {
+// A fresh application per case, not per file: the login rate limiter keeps its counters in the
+// instance, and authenticateAs signs in with the same username in every case.
+beforeEach(async () => {
   app = await startTestApp();
 });
 
 afterEach(async () => {
+  await app.close();
   await resetDatabase();
 });
 
 afterAll(async () => {
-  await app.close();
   await testPrisma.$disconnect();
 });
 
@@ -3245,7 +3255,7 @@ Crie `tests/modules/users/users.password.integration.test.ts`:
 
 ```ts
 import { FastifyInstance } from "fastify";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Permission } from "../../../src/generated/prisma/index.js";
 import { verifyPassword } from "../../../src/modules/auth/auth.password.js";
 import { authenticateAs, startTestApp } from "../../support/app.js";
@@ -3255,16 +3265,18 @@ const NEXT = "an-even-better-password";
 
 let app: FastifyInstance;
 
-beforeAll(async () => {
+// A fresh application per case, not per file: the login rate limiter keeps its counters in the
+// instance, and authenticateAs signs in with the same username in every case.
+beforeEach(async () => {
   app = await startTestApp();
 });
 
 afterEach(async () => {
+  await app.close();
   await resetDatabase();
 });
 
 afterAll(async () => {
-  await app.close();
   await testPrisma.$disconnect();
 });
 
