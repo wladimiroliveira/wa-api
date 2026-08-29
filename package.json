@@ -16,7 +16,8 @@
     "services:up": "docker compose up -d --wait",
     "services:down": "docker compose down",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
     "build:prisma-client": "node --input-type=commonjs --eval \"require('node:fs').cpSync('src/generated', 'dist/generated', { recursive: true })\"",
     "prebuild": "npm run db:generate",
     "typecheck": "tsc --noEmit -p tsconfig.check.json",
@@ -28,6 +29,7 @@
     "@fastify/rate-limit": "11.2.0",
     "@prisma/client": "6.19.3",
     "dotenv": "17.4.2",
+    "dotenv-expand": "1000.0.0",
     "fastify": "5.8.5",
     "fastify-type-provider-zod": "6.1.0",
     "zod": "4.3.6"
