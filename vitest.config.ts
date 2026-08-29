@@ -1,5 +1,7 @@
-import "dotenv/config";
 import { defineConfig } from "vitest/config";
+import { loadDotenv } from "./src/lib/dotenv.js";
+
+loadDotenv();
 
 // src/lib/prisma.ts builds its client at import time, from DATABASE_URL. Handing the workers the
 // test URL here is what keeps the suite off the development database: setting it inside a test file

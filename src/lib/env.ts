@@ -1,7 +1,9 @@
+import { z } from "zod";
+import { loadDotenv } from "./dotenv.js";
+
 // Loading the .env here, and not at the entrypoint, keeps the guarantee independent of import order:
 // whoever reaches this module reads an environment that is already complete.
-import "dotenv/config";
-import { z } from "zod";
+loadDotenv();
 
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3333),
