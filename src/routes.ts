@@ -4,6 +4,7 @@ import { z } from "zod";
 import { applyAccessControl, PUBLIC } from "./modules/auth/auth.access.js";
 import { loadAuthenticatedUser } from "./modules/auth/auth.repository.js";
 import authRoutes from "./modules/auth/auth.routes.js";
+import entriesRoutes from "./modules/entries/entries.routes.js";
 import rolesRoutes from "./modules/roles/roles.routes.js";
 import usersRoutes from "./modules/users/users.routes.js";
 
@@ -24,4 +25,5 @@ export default async function (app: FastifyInstance) {
   await app.register(authRoutes);
   await app.register(rolesRoutes);
   await app.register(usersRoutes);
+  await app.register(entriesRoutes);
 }
