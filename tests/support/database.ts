@@ -7,5 +7,7 @@ export const testPrisma = new PrismaClient();
 // Truncating beats deleting row by row: it resets every table in one statement and does not depend
 // on the order the foreign keys were declared in.
 export async function resetDatabase(): Promise<void> {
-  await testPrisma.$executeRawUnsafe(`TRUNCATE TABLE "refresh_tokens", "users", "roles" RESTART IDENTITY CASCADE`);
+  await testPrisma.$executeRawUnsafe(
+    `TRUNCATE TABLE "stock_movements", "product_stocks", "products", "refresh_tokens", "users", "roles" RESTART IDENTITY CASCADE`,
+  );
 }
