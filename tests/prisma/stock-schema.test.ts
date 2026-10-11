@@ -26,7 +26,7 @@ describe("stock schema", () => {
     );
   });
 
-  it("knows only the entry movement for now", () => {
+  it("knows the entry and the two movements of a production", () => {
     const block = /enum StockMovementType \{([\s\S]*?)\n\}/.exec(SCHEMA);
     expect(block).not.toBeNull();
 
@@ -35,7 +35,7 @@ describe("stock schema", () => {
       .map((line) => line.trim())
       .filter((line) => line !== "" && !line.startsWith("@@"));
 
-    expect(values).toEqual(["ENTRY"]);
+    expect(values).toEqual(["ENTRY", "PRODUCTION_CONSUMPTION", "PRODUCTION_OUTPUT"]);
     expect(SCHEMA).toMatch(/enum StockMovementType \{[\s\S]*?@@map\("stock_movement_type"\)/);
   });
 

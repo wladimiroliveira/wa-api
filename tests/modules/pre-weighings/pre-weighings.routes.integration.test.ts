@@ -60,6 +60,9 @@ const postPreWeighing = (headers: Headers, payload: Record<string, unknown>) =>
 const getPreWeighing = (headers: Headers, id: string) =>
   app.inject({ method: "GET", url: `/v1/pre-weighings/${id}`, headers });
 
+const listPreWeighings = (headers: Headers, query: Record<string, string> = {}) =>
+  app.inject({ method: "GET", url: "/v1/pre-weighings", headers, query });
+
 const canRead = () => authenticateAs(app, [Permission.PRODUCTION_READ]);
 const canCreate = () => authenticateAs(app, [Permission.PRODUCTION_CREATE]);
 
@@ -340,6 +343,98 @@ describe("GET /v1/pre-weighings/:id", () => {
 
   it("answers 401 without a token", async () => {
     expect((await getPreWeighing(undefined, MISSING_ID)).statusCode).toBe(401);
+  });
+});
+
+describe("GET /v1/pre-weighings", () => {
+  // Three pre-weighings of dough, recorded a day apart, named from the oldest to the newest.
+  async function recordThree(userId: string) {
+    const { dough, flour, water } = await createDough();
+    const ids: string[] = [];
+
+    for (const day of ["01", "02", "03"]) {
+      const { id } = await testPrisma.preWeighing.create({
+        data: {
+          productSku: dough.sku,
+          quantity: "50",
+          createdById: userId,
+          createdAt: new Date(`2026-10-${day}T12:00:00Z`),
+          items: {
+            create: [
+              { productSku: flour.sku, plannedQuantity: "30", weighedQuantity: "30" },
+              { productSku: water.sku, plannedQuantity: "18", weighedQuantity: "18" },
+            ],
+          },
+        },
+      });
+      ids.push(id);
+    }
+
+    return { dough, ids };
+  }
+
+  const idsOf = (response: { json: () => { items: { id: string }[] } }) => response.json().items.map(({ id }) => id);
+
+  it("lists the pre-weighings, the newest first, each as it was recorded", async () => {
+    const { headers, userId } = await canRead();
+    const { ids } = await recordThree(userId);
+
+    const response = await listPreWeighings(headers);
+
+    expect(response.statusCode).toBe(200);
+    expect(idsOf(response)).toEqual([ids[2], ids[1], ids[0]]);
+    expect(response.json().nextCursor).toBeNull();
+    expect(response.json().items[0]).toEqual((await getPreWeighing(headers, ids[2])).json());
+  });
+
+  it("lists only the pre-weighings no production is using when asked for the available ones", async () => {
+    const { headers, userId } = await canRead();
+    const { dough, ids } = await recordThree(userId);
+    await testPrisma.production.create({
+      data: {
+        createdById: userId,
+        items: { create: [{ productSku: dough.sku, preWeighingId: ids[1], expectedQuantity: "50" }] },
+      },
+    });
+
+    expect(idsOf(await listPreWeighings(headers, { available: "true" }))).toEqual([ids[2], ids[0]]);
+    expect(idsOf(await listPreWeighings(headers, { available: "false" }))).toEqual([ids[1]]);
+  });
+
+  it("hands the list out in pages, each pointing to the next", async () => {
+    const { headers, userId } = await canRead();
+    const { ids } = await recordThree(userId);
+
+    const page = await listPreWeighings(headers, { limit: "2" });
+
+    expect(idsOf(page)).toEqual([ids[2], ids[1]]);
+    expect(page.json().nextCursor).toBe(ids[1]);
+
+    const next = await listPreWeighings(headers, { limit: "2", cursor: page.json().nextCursor });
+
+    expect(idsOf(next)).toEqual([ids[0]]);
+    expect(next.json().nextCursor).toBeNull();
+  });
+
+  it.each([
+    ["a zero limit", { limit: "0" }],
+    ["a limit above a hundred", { limit: "101" }],
+    ["a cursor that is not an id", { cursor: "next" }],
+    ["an availability that is neither true nor false", { available: "maybe" }],
+  ])("answers 400 for %s", async (_label, query: Record<string, string>) => {
+    const { headers } = await canRead();
+
+    expect((await listPreWeighings(headers, query)).statusCode).toBe(400);
+  });
+
+  it("answers 403 without PRODUCTION_READ", async () => {
+    const { headers } = await canCreate();
+
+    expect((await listPreWeighings(headers)).statusCode).toBe(403);
+  });
+
+  it("answers 401 without a token", async () => {
+    expect((await listPreWeighings(undefined)).statusCode).toBe(401);
   });
 });
 
