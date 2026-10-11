@@ -48,6 +48,7 @@ model User {
   isActive         Boolean         @default(true) @map("is_active")
   refreshTokens    RefreshToken[]
   stockMovements   StockMovement[]
+  preWeighings     PreWeighing[]
   createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -86,18 +87,20 @@ enum MeasurementUnit {
 }
 
 model Product {
-  sku         String             @id @default(uuid(7)) @db.Uuid
-  gtin        String?            @unique
-  description String             @unique
-  kind        ProductKind
-  unit        MeasurementUnit
-  stock       ProductStock?
-  movements   StockMovement[]
-  recipe      Recipe?
-  usedIn      RecipeIngredient[]
-  isActive    Boolean            @default(true) @map("is_active")
-  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  sku              String             @id @default(uuid(7)) @db.Uuid
+  gtin             String?            @unique
+  description      String             @unique
+  kind             ProductKind
+  unit             MeasurementUnit
+  stock            ProductStock?
+  movements        StockMovement[]
+  recipe           Recipe?
+  usedIn           RecipeIngredient[]
+  preWeighings     PreWeighing[]
+  preWeighingItems PreWeighingItem[]
+  isActive         Boolean            @default(true) @map("is_active")
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("products")
 }
@@ -158,4 +161,32 @@ model RecipeIngredient {
   @@unique([recipeId, productSku], map: "uq_recipe_ingredients_recipe_id_product_sku")
   @@index([productSku], map: "idx_recipe_ingredients_product_sku")
   @@map("recipe_ingredients")
+}
+
+model PreWeighing {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  productSku  String            @map("product_sku") @db.Uuid
+  product     Product           @relation(fields: [productSku], references: [sku], onDelete: Restrict)
+  quantity    Decimal           @db.Decimal(18, 6)
+  items       PreWeighingItem[]
+  createdById String            @map("created_by_id") @db.Uuid
+  createdBy   User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([productSku, createdAt(sort: Desc), id(sort: Desc)], map: "idx_pre_weighings_product_sku_created_at")
+  @@map("pre_weighings")
+}
+
+model PreWeighingItem {
+  id              String      @id @default(uuid(7)) @db.Uuid
+  preWeighingId   String      @map("pre_weighing_id") @db.Uuid
+  preWeighing     PreWeighing @relation(fields: [preWeighingId], references: [id], onDelete: Restrict)
+  productSku      String      @map("product_sku") @db.Uuid
+  product         Product     @relation(fields: [productSku], references: [sku], onDelete: Restrict)
+  plannedQuantity Decimal     @map("planned_quantity") @db.Decimal(18, 6)
+  weighedQuantity Decimal     @map("weighed_quantity") @db.Decimal(18, 6)
+
+  @@unique([preWeighingId, productSku], map: "uq_pre_weighing_items_pre_weighing_id_product_sku")
+  @@index([productSku], map: "idx_pre_weighing_items_product_sku")
+  @@map("pre_weighing_items")
 }

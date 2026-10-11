@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { MeasurementUnit, StockMovementType } from "../../generated/prisma/index.js";
+import { StockMovementType } from "../../generated/prisma/index.js";
 import { decimalSchema, positiveDecimalSchema } from "../../lib/decimal.js";
+import { productSummarySchema } from "../products/products.schemas.js";
 
 export const createEntryBodySchema = z.object({
   productSku: z.uuid(),
@@ -14,6 +15,6 @@ export const entrySchema = z.object({
   quantity: z.string(),
   unitCost: z.string(),
   createdAt: z.iso.datetime(),
-  product: z.object({ sku: z.uuid(), description: z.string(), unit: z.enum(MeasurementUnit) }),
+  product: productSummarySchema,
   stock: z.object({ quantity: z.string(), lastEntryCost: z.string(), averageCost: z.string() }),
 });

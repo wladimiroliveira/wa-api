@@ -1,0 +1,32 @@
+import { z } from "zod";
+import { positiveDecimalSchema } from "../../lib/decimal.js";
+import { listsEachProductOnce, productSummarySchema } from "../products/products.schemas.js";
+
+// The quantity is how much of the product is to be produced, in the unit of the product.
+const targetSchema = { productSku: z.uuid(), quantity: positiveDecimalSchema };
+
+export const preWeighingPlanQuerySchema = z.object(targetSchema);
+
+export const createPreWeighingBodySchema = z.object({
+  ...targetSchema,
+  items: z
+    .array(z.object({ productSku: z.uuid(), weighedQuantity: positiveDecimalSchema }))
+    .min(1)
+    .refine(listsEachProductOnce, { message: "An item is listed more than once." }),
+});
+
+export const preWeighingIdParamsSchema = z.object({ id: z.uuid() });
+
+export const preWeighingPlanSchema = z.object({
+  product: productSummarySchema,
+  quantity: z.string(),
+  items: z.array(z.object({ product: productSummarySchema, plannedQuantity: z.string() })),
+});
+
+export const preWeighingSchema = z.object({
+  id: z.uuid(),
+  product: productSummarySchema,
+  quantity: z.string(),
+  createdAt: z.iso.datetime(),
+  items: z.array(z.object({ product: productSummarySchema, plannedQuantity: z.string(), weighedQuantity: z.string() })),
+});
