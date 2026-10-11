@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { positiveDecimalSchema } from "../../lib/decimal.js";
+import { pageQuerySchema, pageSchema } from "../../lib/pagination.js";
 import { listsEachProductOnce, productSummarySchema } from "../products/products.schemas.js";
 
 // The quantity is how much of the product is to be produced, in the unit of the product.
@@ -17,6 +18,14 @@ export const createPreWeighingBodySchema = z.object({
 
 export const preWeighingIdParamsSchema = z.object({ id: z.uuid() });
 
+// A pre-weighing is available while no production is using it.
+export const listPreWeighingsQuerySchema = pageQuerySchema.extend({
+  available: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .optional(),
+});
+
 export const preWeighingPlanSchema = z.object({
   product: productSummarySchema,
   quantity: z.string(),
@@ -30,3 +39,5 @@ export const preWeighingSchema = z.object({
   createdAt: z.iso.datetime(),
   items: z.array(z.object({ product: productSummarySchema, plannedQuantity: z.string(), weighedQuantity: z.string() })),
 });
+
+export const preWeighingPageSchema = pageSchema(preWeighingSchema);

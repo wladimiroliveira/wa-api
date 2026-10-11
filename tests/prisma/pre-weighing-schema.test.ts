@@ -47,6 +47,10 @@ describe("pre-weighing schema", () => {
     );
   });
 
+  it("indexes the pre-weighings for cursor pagination", () => {
+    expect(SCHEMA).toContain(`@@index([createdAt(sort: Desc), id(sort: Desc)], map: "idx_pre_weighings_created_at")`);
+  });
+
   it("violates no rule of the table convention", () => {
     expect(findSchemaConventionViolations(SCHEMA)).toEqual([]);
   });

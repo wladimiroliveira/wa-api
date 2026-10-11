@@ -2,10 +2,18 @@ import { FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { Permission } from "../../generated/prisma/index.js";
 import { messageSchema } from "../auth/auth.schemas.js";
-import { findPreWeighingById, insertPreWeighing, PreWeighingRecord } from "./pre-weighings.repository.js";
+import { toPage } from "../../lib/pagination.js";
+import {
+  findPreWeighingById,
+  insertPreWeighing,
+  listPreWeighings,
+  PreWeighingRecord,
+} from "./pre-weighings.repository.js";
 import {
   createPreWeighingBodySchema,
+  listPreWeighingsQuerySchema,
   preWeighingIdParamsSchema,
+  preWeighingPageSchema,
   preWeighingPlanQuerySchema,
   preWeighingPlanSchema,
   preWeighingSchema,
@@ -94,6 +102,24 @@ export default async function preWeighingsRoutes(app: FastifyInstance) {
       });
 
       return reply.code(201).send(toResponse(preWeighing));
+    },
+  );
+
+  typed.get(
+    "/pre-weighings",
+    {
+      config: { auth: Permission.PRODUCTION_READ },
+      schema: {
+        tags: ["pre-weighings"],
+        summary: "Lista as pré-pesagens, das mais recentes para as mais antigas",
+        querystring: listPreWeighingsQuerySchema,
+        response: { 200: preWeighingPageSchema },
+      },
+    },
+    async (request, reply) => {
+      const { items, nextCursor } = toPage(await listPreWeighings(request.query), request.query);
+
+      return reply.send({ items: items.map(toResponse), nextCursor });
     },
   );
 

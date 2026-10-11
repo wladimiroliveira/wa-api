@@ -6,6 +6,7 @@ import { loadAuthenticatedUser } from "./modules/auth/auth.repository.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import entriesRoutes from "./modules/entries/entries.routes.js";
 import preWeighingsRoutes from "./modules/pre-weighings/pre-weighings.routes.js";
+import productionsRoutes from "./modules/productions/productions.routes.js";
 import recipesRoutes from "./modules/recipes/recipes.routes.js";
 import rolesRoutes from "./modules/roles/roles.routes.js";
 import usersRoutes from "./modules/users/users.routes.js";
@@ -30,4 +31,5 @@ export default async function (app: FastifyInstance) {
   await app.register(entriesRoutes);
   await app.register(recipesRoutes);
   await app.register(preWeighingsRoutes);
+  await app.register(productionsRoutes);
 }
