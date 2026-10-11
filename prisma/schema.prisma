@@ -38,17 +38,18 @@ model Role {
 }
 
 model User {
-  id               String         @id @default(uuid(7)) @db.Uuid
+  id               String          @id @default(uuid(7)) @db.Uuid
   name             String
-  username         String         @unique
-  passwordHash     String         @map("password_hash")
-  roleId           String?        @map("role_id") @db.Uuid
-  role             Role?          @relation(fields: [roleId], references: [id], onDelete: SetNull)
-  extraPermissions Permission[]   @map("extra_permissions")
-  isActive         Boolean        @default(true) @map("is_active")
+  username         String          @unique
+  passwordHash     String          @map("password_hash")
+  roleId           String?         @map("role_id") @db.Uuid
+  role             Role?           @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  extraPermissions Permission[]    @map("extra_permissions")
+  isActive         Boolean         @default(true) @map("is_active")
   refreshTokens    RefreshToken[]
-  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  stockMovements   StockMovement[]
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("users")
 }
@@ -65,4 +66,69 @@ model RefreshToken {
 
   @@index([userId], map: "idx_refresh_tokens_user_id")
   @@map("refresh_tokens")
+}
+
+enum ProductKind {
+  GOODS
+  MANUFACTURED
+
+  @@map("product_kind")
+}
+
+enum MeasurementUnit {
+  UNIT
+  KILOGRAM
+  GRAM
+  LITER
+  MILLILITER
+
+  @@map("measurement_unit")
+}
+
+model Product {
+  sku         String          @id @default(uuid(7)) @db.Uuid
+  gtin        String?         @unique
+  description String          @unique
+  kind        ProductKind
+  unit        MeasurementUnit
+  stock       ProductStock?
+  movements   StockMovement[]
+  isActive    Boolean         @default(true) @map("is_active")
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("products")
+}
+
+model ProductStock {
+  productSku      String   @id @map("product_sku") @db.Uuid
+  product         Product  @relation(fields: [productSku], references: [sku], onDelete: Restrict)
+  quantity        Decimal  @default(0) @db.Decimal(18, 6)
+  lastEntryCost   Decimal? @map("last_entry_cost") @db.Decimal(18, 6)
+  averageCost     Decimal? @map("average_cost") @db.Decimal(18, 6)
+  minimumQuantity Decimal? @map("minimum_quantity") @db.Decimal(18, 6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("product_stocks")
+}
+
+enum StockMovementType {
+  ENTRY
+
+  @@map("stock_movement_type")
+}
+
+model StockMovement {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  productSku  String            @map("product_sku") @db.Uuid
+  product     Product           @relation(fields: [productSku], references: [sku], onDelete: Restrict)
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(18, 6)
+  unitCost    Decimal           @map("unit_cost") @db.Decimal(18, 6)
+  createdById String            @map("created_by_id") @db.Uuid
+  createdBy   User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([productSku, createdAt(sort: Desc), id(sort: Desc)], map: "idx_stock_movements_product_sku_created_at")
+  @@map("stock_movements")
 }

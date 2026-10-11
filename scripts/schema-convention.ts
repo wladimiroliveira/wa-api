@@ -109,22 +109,32 @@ function readQuotedArgument(source: string, pattern: RegExp): string | null {
   return match === null ? null : match[1];
 }
 
+const toSnakeCase = (name: string) => name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+
+const parseNameList = (list: string) =>
+  list
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name !== "");
+
 // The convention calls a foreign key "a relation scalar", so the fields a @relation lists are
-// authoritative; the name heuristic stays as a fallback for a schema that omits the relation.
-function parseRelationScalars(body: string): Set<string> {
-  const names = new Set<string>();
+// authoritative; the name heuristic stays as a fallback for a schema that omits the relation. Each
+// scalar is paired with the key it references, because that key names the column's suffix.
+function parseRelationScalars(body: string): Map<string, string> {
+  const referencedKeys = new Map<string, string>();
 
   for (const { text } of parseCalls(body, /@relation\s*\(/g)) {
     const fields = /fields:\s*\[([^\]]*)\]/.exec(text);
     if (fields === null) continue;
 
-    for (const name of fields[1].split(",")) {
-      const trimmed = name.trim();
-      if (trimmed !== "") names.add(trimmed);
-    }
+    const references = parseNameList(/references:\s*\[([^\]]*)\]/.exec(text)?.[1] ?? "");
+
+    parseNameList(fields[1]).forEach((name, position) => {
+      referencedKeys.set(name, references[position] ?? "id");
+    });
   }
 
-  return names;
+  return referencedKeys;
 }
 
 function parseEnumValues(body: string): string[] {
@@ -201,8 +211,14 @@ export function findSchemaConventionViolations(source: string): SchemaViolation[
         report(field.name, "uuid-native-type", "identifier without @db.Uuid becomes TEXT instead of UUID");
       }
 
-      if (isForeignKey && !column.endsWith("_id")) {
-        report(field.name, "foreign-key-suffix", `foreign key column "${column}" does not end with _id`);
+      const foreignKeySuffix = `_${toSnakeCase(relationScalars.get(field.name) ?? "id")}`;
+
+      if (isForeignKey && !column.endsWith(foreignKeySuffix)) {
+        report(
+          field.name,
+          "foreign-key-suffix",
+          `foreign key column "${column}" does not end with ${foreignKeySuffix}`,
+        );
       }
 
       if (field.type === "Decimal" && !/@db\.Decimal\(\d+,\s*\d+\)/.test(field.attributes)) {
