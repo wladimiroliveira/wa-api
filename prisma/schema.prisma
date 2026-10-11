@@ -86,16 +86,18 @@ enum MeasurementUnit {
 }
 
 model Product {
-  sku         String          @id @default(uuid(7)) @db.Uuid
-  gtin        String?         @unique
-  description String          @unique
+  sku         String             @id @default(uuid(7)) @db.Uuid
+  gtin        String?            @unique
+  description String             @unique
   kind        ProductKind
   unit        MeasurementUnit
   stock       ProductStock?
   movements   StockMovement[]
-  isActive    Boolean         @default(true) @map("is_active")
-  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  recipe      Recipe?
+  usedIn      RecipeIngredient[]
+  isActive    Boolean            @default(true) @map("is_active")
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("products")
 }
@@ -131,4 +133,29 @@ model StockMovement {
 
   @@index([productSku, createdAt(sort: Desc), id(sort: Desc)], map: "idx_stock_movements_product_sku_created_at")
   @@map("stock_movements")
+}
+
+model Recipe {
+  id            String             @id @default(uuid(7)) @db.Uuid
+  productSku    String             @unique @map("product_sku") @db.Uuid
+  product       Product            @relation(fields: [productSku], references: [sku], onDelete: Restrict)
+  yieldQuantity Decimal            @map("yield_quantity") @db.Decimal(18, 6)
+  ingredients   RecipeIngredient[]
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id         String  @id @default(uuid(7)) @db.Uuid
+  recipeId   String  @map("recipe_id") @db.Uuid
+  recipe     Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  productSku String  @map("product_sku") @db.Uuid
+  product    Product @relation(fields: [productSku], references: [sku], onDelete: Restrict)
+  quantity   Decimal @db.Decimal(18, 6)
+
+  @@unique([recipeId, productSku], map: "uq_recipe_ingredients_recipe_id_product_sku")
+  @@index([productSku], map: "idx_recipe_ingredients_product_sku")
+  @@map("recipe_ingredients")
 }

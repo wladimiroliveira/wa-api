@@ -8,6 +8,6 @@ export const testPrisma = new PrismaClient();
 // on the order the foreign keys were declared in.
 export async function resetDatabase(): Promise<void> {
   await testPrisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "stock_movements", "product_stocks", "products", "refresh_tokens", "users", "roles" RESTART IDENTITY CASCADE`,
+    `TRUNCATE TABLE "recipe_ingredients", "recipes", "stock_movements", "product_stocks", "products", "refresh_tokens", "users", "roles" RESTART IDENTITY CASCADE`,
   );
 }
