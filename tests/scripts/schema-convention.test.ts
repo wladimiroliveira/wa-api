@@ -271,6 +271,39 @@ model Order {
     ]);
   });
 
+  it("accepts a foreign key named after the key it references, when that key is not id", () => {
+    const source = `
+model ProductStock {
+  id         String  @id @default(uuid(7)) @db.Uuid
+  product    Product @relation(fields: [productSku], references: [sku])
+  productSku String  @map("product_sku") @db.Uuid
+
+  @@map("product_stocks")
+}
+`;
+    expect(rulesFor(source)).toEqual([]);
+  });
+
+  it("rejects a foreign key ending in _id when the key it references is not id", () => {
+    const source = `
+model ProductStock {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  product   Product @relation(fields: [productId], references: [sku])
+  productId String  @map("product_id") @db.Uuid
+
+  @@map("product_stocks")
+}
+`;
+    expect(findSchemaConventionViolations(source)).toEqual([
+      {
+        model: "ProductStock",
+        field: "productId",
+        rule: "foreign-key-suffix",
+        message: `foreign key column "product_id" does not end with _sku`,
+      },
+    ]);
+  });
+
   it("keeps the project schema free of violations", () => {
     expect(findSchemaConventionViolations(readFileSync(SCHEMA_PATH, "utf8"))).toEqual([]);
   });

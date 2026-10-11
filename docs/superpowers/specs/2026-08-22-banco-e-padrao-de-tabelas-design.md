@@ -63,8 +63,8 @@ e nenhum objeto TypeScript foge do estilo da linguagem.
 | Coluna              | `snake_case`, singular                            | `quantity_base`, `created_at`                                 |
 | Modelo Prisma       | `PascalCase` singular + `@@map`                   | `model StockMovement { @@map("stock_movements") }`            |
 | Campo Prisma        | `camelCase` + `@map`                              | `quantityBase Decimal @map("quantity_base")`                  |
-| Chave primária      | sempre `id`                                       | `id`                                                          |
-| Chave estrangeira   | `<tabela_referenciada_singular>_id`               | `supply_id`, `sale_id`                                        |
+| Chave primária      | `id`; em `products`, `sku`                        | `id`, `sku`                                                   |
+| Chave estrangeira   | `<tabela_referenciada_singular>_<chave>`          | `sale_id`, `product_sku`                                      |
 | Booleano            | prefixo `is_` ou `has_`                           | `is_active`                                                   |
 | Data e hora         | sufixo `_at`, sempre `timestamptz`                | `created_at`, `revoked_at`                                    |
 | Tipo enum           | `snake_case` singular, valores `SCREAMING_SNAKE`  | `stock_movement_type` → `ENTRY`, `SALE`                       |
@@ -173,7 +173,8 @@ O teste lê `prisma/schema.prisma` e falha quando:
 - um campo de tipo `String` usado como `@id` ou como FK não declara `@db.Uuid`;
 - um campo `Decimal` não declara `@db.Decimal(p,s)`;
 - um campo `DateTime` não declara `@db.Timestamptz(3)`;
-- um campo escalar de relação não termina em `_id` no nome mapeado;
+- um campo escalar de relação não termina, no nome mapeado, com o nome da chave
+  que referencia (`_id`, ou `_sku` quando aponta para `products`);
 - um campo `Boolean` não começa com `is` ou `has`;
 - um campo `DateTime` não termina em `At`;
 - um `@@index` não declara `map:` começando com `idx_`, em snake_case;
