@@ -154,6 +154,39 @@ export async function takeFromLots(
   return taken;
 }
 
+// Takes a quantity out of one given lot, whatever its date: this is how what is expired or damaged
+// leaves the stock. Unlike a lot taken from in turn, a lot named outright cannot go short, so more
+// than it holds is refused.
+type NamedLot = {
+  id: string;
+  productSku: string;
+  quantity: Prisma.Decimal;
+  unitCost: Prisma.Decimal;
+  expiresAt: Date | null;
+};
+
+type LotTake = { failure: "missing" | "insufficient" } | { lot: NamedLot & { left: Prisma.Decimal } };
+
+export async function takeFromLot(
+  client: Prisma.TransactionClient,
+  { lotId, quantity }: { lotId: string; quantity: Prisma.Decimal },
+): Promise<LotTake> {
+  const [lot] = await client.$queryRaw<NamedLot[]>`
+    SELECT id, product_sku AS "productSku", quantity, unit_cost AS "unitCost", expires_at AS "expiresAt"
+    FROM stock_lots
+    WHERE id = ${lotId}::uuid
+    FOR UPDATE
+  `;
+
+  if (lot === undefined) return { failure: "missing" };
+  if (quantity.gt(lot.quantity)) return { failure: "insufficient" };
+
+  await client.stockLot.update({ where: { id: lotId }, data: { quantity: { decrement: quantity } } });
+  await decreaseStock(client, { productSku: lot.productSku, quantity: quantity.toString() });
+
+  return { lot: { ...lot, left: lot.quantity.sub(quantity) } };
+}
+
 async function newestLotCost(client: Prisma.TransactionClient, productSku: string) {
   const lot = await client.stockLot.findFirst({
     where: { productSku },

@@ -3,6 +3,7 @@
 exports[`routes inventory > matches the recorded access of every route 1`] = `
 "DELETE /v1/roles/:id -> ACCESS_UPDATE
 GET /v1/health -> public
+GET /v1/loss-reasons -> authenticated
 GET /v1/pre-weighings -> PRODUCTION_READ
 GET /v1/pre-weighings/:id -> PRODUCTION_READ
 GET /v1/pre-weighings/plan -> PRODUCTION_READ
@@ -19,6 +20,7 @@ GET /v1/suppliers -> CATALOG_READ
 GET /v1/users -> ACCESS_READ
 GET /v1/users/:id -> ACCESS_READ
 HEAD /v1/health -> public
+HEAD /v1/loss-reasons -> authenticated
 HEAD /v1/pre-weighings -> PRODUCTION_READ
 HEAD /v1/pre-weighings/:id -> PRODUCTION_READ
 HEAD /v1/pre-weighings/plan -> PRODUCTION_READ
@@ -34,11 +36,14 @@ HEAD /v1/stock/:sku -> REPORTS_READ
 HEAD /v1/suppliers -> CATALOG_READ
 HEAD /v1/users -> ACCESS_READ
 HEAD /v1/users/:id -> ACCESS_READ
+PATCH /v1/loss-reasons/:id -> LOSSES_UPDATE
 PATCH /v1/roles/:id -> ACCESS_UPDATE
 PATCH /v1/sessions/me/password -> authenticated
 PATCH /v1/users/:id -> ACCESS_UPDATE
 PATCH /v1/users/:id/password -> ACCESS_UPDATE
 POST /v1/entries -> ENTRIES_CREATE
+POST /v1/loss-reasons -> LOSSES_UPDATE
+POST /v1/losses -> LOSSES_CREATE
 POST /v1/pre-weighings -> PRODUCTION_CREATE
 POST /v1/productions -> PRODUCTION_CREATE
 POST /v1/productions/:id/cancel -> PRODUCTION_CREATE

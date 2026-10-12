@@ -5,6 +5,7 @@ import { applyAccessControl, PUBLIC } from "./modules/auth/auth.access.js";
 import { loadAuthenticatedUser } from "./modules/auth/auth.repository.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import entriesRoutes from "./modules/entries/entries.routes.js";
+import lossesRoutes from "./modules/losses/losses.routes.js";
 import preWeighingsRoutes from "./modules/pre-weighings/pre-weighings.routes.js";
 import productionsRoutes from "./modules/productions/productions.routes.js";
 import productsRoutes from "./modules/products/products.routes.js";
@@ -35,6 +36,7 @@ export default async function (app: FastifyInstance) {
   await app.register(suppliersRoutes);
   await app.register(entriesRoutes);
   await app.register(stockRoutes);
+  await app.register(lossesRoutes);
   await app.register(recipesRoutes);
   await app.register(preWeighingsRoutes);
   await app.register(productionsRoutes);
