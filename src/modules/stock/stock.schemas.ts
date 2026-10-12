@@ -22,6 +22,8 @@ export const stockMovementSchema = z.object({
   unitCost: z.string(),
   createdAt: z.iso.datetime(),
   product: productSummarySchema,
+  // Null for a movement that moved no lot: what was taken beyond the lots, or a balance adjustment.
+  lot: z.object({ id: z.uuid(), expiresAt: z.iso.date().nullable(), supplier: supplierSchema.nullable() }).nullable(),
   createdBy: z.object({ id: z.uuid(), name: z.string() }),
 });
 

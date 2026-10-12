@@ -189,6 +189,7 @@ export function listStockMovements(query: { productSku?: string; limit: number; 
       unitCost: true,
       createdAt: true,
       product: { select: { sku: true, description: true, unit: true } },
+      lot: { select: { id: true, expiresAt: true, supplier: { select: { id: true, name: true } } } },
       createdBy: { select: { id: true, name: true } },
     },
     ...pageArgs(page),
