@@ -275,6 +275,8 @@
                           "SALES_READ",
                           "SALES_CREATE",
                           "REPORTS_READ",
+                          "LOSSES_CREATE",
+                          "LOSSES_UPDATE",
                           "ACCESS_READ",
                           "ACCESS_CREATE",
                           "ACCESS_UPDATE"
@@ -397,6 +399,8 @@
                             "SALES_READ",
                             "SALES_CREATE",
                             "REPORTS_READ",
+                            "LOSSES_CREATE",
+                            "LOSSES_UPDATE",
                             "ACCESS_READ",
                             "ACCESS_CREATE",
                             "ACCESS_UPDATE"
@@ -449,6 +453,8 @@
                         "SALES_READ",
                         "SALES_CREATE",
                         "REPORTS_READ",
+                        "LOSSES_CREATE",
+                        "LOSSES_UPDATE",
                         "ACCESS_READ",
                         "ACCESS_CREATE",
                         "ACCESS_UPDATE"
@@ -495,6 +501,8 @@
                           "SALES_READ",
                           "SALES_CREATE",
                           "REPORTS_READ",
+                          "LOSSES_CREATE",
+                          "LOSSES_UPDATE",
                           "ACCESS_READ",
                           "ACCESS_CREATE",
                           "ACCESS_UPDATE"
@@ -567,6 +575,8 @@
                         "SALES_READ",
                         "SALES_CREATE",
                         "REPORTS_READ",
+                        "LOSSES_CREATE",
+                        "LOSSES_UPDATE",
                         "ACCESS_READ",
                         "ACCESS_CREATE",
                         "ACCESS_UPDATE"
@@ -621,6 +631,8 @@
                           "SALES_READ",
                           "SALES_CREATE",
                           "REPORTS_READ",
+                          "LOSSES_CREATE",
+                          "LOSSES_UPDATE",
                           "ACCESS_READ",
                           "ACCESS_CREATE",
                           "ACCESS_UPDATE"
@@ -774,6 +786,8 @@
                             "SALES_READ",
                             "SALES_CREATE",
                             "REPORTS_READ",
+                            "LOSSES_CREATE",
+                            "LOSSES_UPDATE",
                             "ACCESS_READ",
                             "ACCESS_CREATE",
                             "ACCESS_UPDATE"
@@ -795,6 +809,8 @@
                             "SALES_READ",
                             "SALES_CREATE",
                             "REPORTS_READ",
+                            "LOSSES_CREATE",
+                            "LOSSES_UPDATE",
                             "ACCESS_READ",
                             "ACCESS_CREATE",
                             "ACCESS_UPDATE"
@@ -870,6 +886,8 @@
                         "SALES_READ",
                         "SALES_CREATE",
                         "REPORTS_READ",
+                        "LOSSES_CREATE",
+                        "LOSSES_UPDATE",
                         "ACCESS_READ",
                         "ACCESS_CREATE",
                         "ACCESS_UPDATE"
@@ -926,6 +944,8 @@
                           "SALES_READ",
                           "SALES_CREATE",
                           "REPORTS_READ",
+                          "LOSSES_CREATE",
+                          "LOSSES_UPDATE",
                           "ACCESS_READ",
                           "ACCESS_CREATE",
                           "ACCESS_UPDATE"
@@ -947,6 +967,8 @@
                           "SALES_READ",
                           "SALES_CREATE",
                           "REPORTS_READ",
+                          "LOSSES_CREATE",
+                          "LOSSES_UPDATE",
                           "ACCESS_READ",
                           "ACCESS_CREATE",
                           "ACCESS_UPDATE"
@@ -1070,6 +1092,8 @@
                           "SALES_READ",
                           "SALES_CREATE",
                           "REPORTS_READ",
+                          "LOSSES_CREATE",
+                          "LOSSES_UPDATE",
                           "ACCESS_READ",
                           "ACCESS_CREATE",
                           "ACCESS_UPDATE"
@@ -1091,6 +1115,8 @@
                           "SALES_READ",
                           "SALES_CREATE",
                           "REPORTS_READ",
+                          "LOSSES_CREATE",
+                          "LOSSES_UPDATE",
                           "ACCESS_READ",
                           "ACCESS_CREATE",
                           "ACCESS_UPDATE"
@@ -1174,6 +1200,8 @@
                         "SALES_READ",
                         "SALES_CREATE",
                         "REPORTS_READ",
+                        "LOSSES_CREATE",
+                        "LOSSES_UPDATE",
                         "ACCESS_READ",
                         "ACCESS_CREATE",
                         "ACCESS_UPDATE"
@@ -1240,6 +1268,8 @@
                           "SALES_READ",
                           "SALES_CREATE",
                           "REPORTS_READ",
+                          "LOSSES_CREATE",
+                          "LOSSES_UPDATE",
                           "ACCESS_READ",
                           "ACCESS_CREATE",
                           "ACCESS_UPDATE"
@@ -1261,6 +1291,8 @@
                           "SALES_READ",
                           "SALES_CREATE",
                           "REPORTS_READ",
+                          "LOSSES_CREATE",
+                          "LOSSES_UPDATE",
                           "ACCESS_READ",
                           "ACCESS_CREATE",
                           "ACCESS_UPDATE"
@@ -1748,7 +1780,8 @@
                         "ENTRY",
                         "PRODUCTION_CONSUMPTION",
                         "PRODUCTION_OUTPUT",
-                        "BALANCE_ADJUSTMENT"
+                        "BALANCE_ADJUSTMENT",
+                        "LOSS"
                       ]
                     },
                     "quantity": {
@@ -1979,7 +2012,8 @@
                               "ENTRY",
                               "PRODUCTION_CONSUMPTION",
                               "PRODUCTION_OUTPUT",
-                              "BALANCE_ADJUSTMENT"
+                              "BALANCE_ADJUSTMENT",
+                              "LOSS"
                             ]
                           },
                           "quantity": {
@@ -2437,6 +2471,455 @@
             }
           },
           "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/loss-reasons": {
+      "get": {
+        "summary": "Lista as modalidades de avaria",
+        "tags": [
+          "losses"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "isActive": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "description",
+                      "isActive"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Cadastra uma modalidade de avaria",
+        "tags": [
+          "losses"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "isActive"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/loss-reasons/{id}": {
+      "patch": {
+        "summary": "Edita, inativa ou reativa uma modalidade de avaria",
+        "tags": [
+          "losses"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "description": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "isActive"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/losses": {
+      "post": {
+        "summary": "Registra a avaria de parte de um lote e baixa do estoque",
+        "tags": [
+          "losses"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lotId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "reasonId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "quantity": {
+                    "type": "string",
+                    "pattern": "^\\d{1,12}(\\.\\d{1,6})?$"
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "lotId",
+                  "reasonId",
+                  "quantity"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "quantity": {
+                      "type": "string"
+                    },
+                    "unitCost": {
+                      "type": "string"
+                    },
+                    "note": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "reason": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "product": {
+                      "type": "object",
+                      "properties": {
+                        "sku": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "UNIT",
+                            "KILOGRAM",
+                            "GRAM",
+                            "LITER",
+                            "MILLILITER"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "sku",
+                        "description",
+                        "unit"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "lot": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "expiresAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        "quantity": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "expiresAt",
+                        "quantity"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "quantity",
+                    "unitCost",
+                    "note",
+                    "createdAt",
+                    "reason",
+                    "product",
+                    "lot"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Default Response",
             "content": {
               "application/json": {

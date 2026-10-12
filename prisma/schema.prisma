@@ -19,6 +19,8 @@ enum Permission {
   SALES_READ
   SALES_CREATE
   REPORTS_READ
+  LOSSES_CREATE
+  LOSSES_UPDATE
   ACCESS_READ
   ACCESS_CREATE
   ACCESS_UPDATE
@@ -48,6 +50,7 @@ model User {
   isActive         Boolean         @default(true) @map("is_active")
   refreshTokens    RefreshToken[]
   stockMovements   StockMovement[]
+  stockLosses      StockLoss[]
   preWeighings     PreWeighing[]
   productions      Production[]
   createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -136,6 +139,7 @@ enum StockMovementType {
   PRODUCTION_CONSUMPTION
   PRODUCTION_OUTPUT
   BALANCE_ADJUSTMENT
+  LOSS
 
   @@map("stock_movement_type")
 }
@@ -146,6 +150,7 @@ model StockMovement {
   product     Product           @relation(fields: [productSku], references: [sku], onDelete: Restrict)
   lotId       String?           @map("lot_id") @db.Uuid
   lot         StockLot?         @relation(fields: [lotId], references: [id], onDelete: Restrict)
+  loss        StockLoss?
   type        StockMovementType
   quantity    Decimal           @db.Decimal(18, 6)
   unitCost    Decimal           @map("unit_cost") @db.Decimal(18, 6)
@@ -172,12 +177,47 @@ model StockLot {
   quantity        Decimal         @db.Decimal(18, 6)
   unitCost        Decimal         @map("unit_cost") @db.Decimal(18, 6)
   movements       StockMovement[]
+  losses          StockLoss[]
   createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([productSku, expiresAt, createdAt], map: "idx_stock_lots_product_sku_expires_at")
   @@index([supplierId], map: "idx_stock_lots_supplier_id")
   @@map("stock_lots")
+}
+
+// Why stock is written off. A reason that is no longer used is deactivated, never deleted: the
+// losses already recorded under it still say why.
+model LossReason {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  name        String      @unique
+  description String?
+  isActive    Boolean     @default(true) @map("is_active")
+  losses      StockLoss[]
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("loss_reasons")
+}
+
+// What was written off a lot, and why. The movement it made in the stock is the one it points to.
+model StockLoss {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  lotId       String        @map("lot_id") @db.Uuid
+  lot         StockLot      @relation(fields: [lotId], references: [id], onDelete: Restrict)
+  reasonId    String        @map("reason_id") @db.Uuid
+  reason      LossReason    @relation(fields: [reasonId], references: [id], onDelete: Restrict)
+  movementId  String        @unique @map("movement_id") @db.Uuid
+  movement    StockMovement @relation(fields: [movementId], references: [id], onDelete: Restrict)
+  note        String?
+  createdById String        @map("created_by_id") @db.Uuid
+  createdBy   User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([lotId], map: "idx_stock_losses_lot_id")
+  @@index([reasonId], map: "idx_stock_losses_reason_id")
+  @@index([createdById], map: "idx_stock_losses_created_by_id")
+  @@map("stock_losses")
 }
 
 model Recipe {
