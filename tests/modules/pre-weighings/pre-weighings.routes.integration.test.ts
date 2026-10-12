@@ -78,10 +78,65 @@ describe("GET /v1/pre-weighings/plan", () => {
       product: { sku: dough.sku, description: "Bread dough", unit: "KILOGRAM" },
       quantity: "50",
       items: [
-        { product: { sku: water.sku, description: "Water", unit: "LITER" }, plannedQuantity: "18" },
-        { product: { sku: flour.sku, description: "Wheat flour", unit: "KILOGRAM" }, plannedQuantity: "30" },
+        {
+          product: { sku: water.sku, description: "Water", unit: "LITER" },
+          plannedQuantity: "18",
+          lots: [],
+          shortfall: "18",
+        },
+        {
+          product: { sku: flour.sku, description: "Wheat flour", unit: "KILOGRAM" },
+          plannedQuantity: "30",
+          lots: [],
+          shortfall: "30",
+        },
       ],
     });
+  });
+
+  it("tells which lots to weigh each ingredient from, the first to expire first, leaving expired ones out", async () => {
+    const { headers } = await canRead();
+    const { dough, flour } = await createDough();
+    const lotOf = (quantity: string, expiresAt: string | null) =>
+      testPrisma.stockLot.create({
+        data: {
+          productSku: flour.sku,
+          quantity,
+          initialQuantity: quantity,
+          unitCost: "2",
+          expiresAt: expiresAt === null ? null : new Date(expiresAt),
+        },
+      });
+    const never = await lotOf("100", null);
+    const sooner = await lotOf("20", "2099-01-31");
+    await lotOf("50", "2020-01-01");
+    const later = await lotOf("4", "2099-06-30");
+
+    const response = await getPlan(headers, { productSku: dough.sku, quantity: "50" });
+    const [, ofFlour] = response.json().items;
+
+    expect(ofFlour).toMatchObject({
+      plannedQuantity: "30",
+      lots: [
+        { id: sooner.id, expiresAt: "2099-01-31", quantity: "20" },
+        { id: later.id, expiresAt: "2099-06-30", quantity: "4" },
+        { id: never.id, expiresAt: null, quantity: "6" },
+      ],
+      shortfall: "0",
+    });
+  });
+
+  it("tells how much of an ingredient the lots do not cover", async () => {
+    const { headers } = await canRead();
+    const { dough, flour } = await createDough();
+    await testPrisma.stockLot.create({
+      data: { productSku: flour.sku, quantity: "12.5", initialQuantity: "20", unitCost: "2" },
+    });
+
+    const [, ofFlour] = (await getPlan(headers, { productSku: dough.sku, quantity: "50" })).json().items;
+
+    expect(ofFlour.lots).toEqual([{ id: expect.any(String), expiresAt: null, quantity: "12.5" }]);
+    expect(ofFlour.shortfall).toBe("17.5");
   });
 
   it("writes nothing", async () => {

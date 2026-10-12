@@ -1,6 +1,9 @@
 import { Prisma } from "../../generated/prisma/index.js";
 import { pageArgs } from "../../lib/pagination.js";
 import { prisma } from "../../lib/prisma.js";
+import { allocate } from "./stock.allocation.js";
+
+const ZERO = new Prisma.Decimal(0);
 
 type StockAfterIncrease = { quantity: Prisma.Decimal; lastEntryCost: Prisma.Decimal; averageCost: Prisma.Decimal };
 
@@ -29,22 +32,136 @@ export function increaseStock(
 }
 
 // Reads the balance of a product and holds it until the transaction ends, so whatever is decided
-// from it is still true when it is written. Null for a product that never moved.
+// from it is still true when it is written. `owed` is what was taken beyond what the lots held and
+// is still to be settled: the lots that are left hold that much more than the balance shows.
 export async function lockStockBalance(client: Prisma.TransactionClient, productSku: string) {
+  // A product that never moved has no row to hold, and two first movements at once would each read
+  // the other's lot against a balance that is not there yet. Opening the row first gives them one.
+  await client.$executeRaw`
+    INSERT INTO product_stocks (product_sku, quantity, updated_at)
+    VALUES (${productSku}::uuid, 0, now())
+    ON CONFLICT (product_sku) DO NOTHING
+  `;
+
   const [balance] = await client.$queryRaw<{ quantity: Prisma.Decimal; lastEntryCost: Prisma.Decimal | null }[]>`
     SELECT quantity, last_entry_cost AS "lastEntryCost"
     FROM product_stocks
     WHERE product_sku = ${productSku}::uuid
     FOR UPDATE
   `;
+  const { _sum } = await client.stockLot.aggregate({ where: { productSku }, _sum: { quantity: true } });
+  const held = _sum.quantity ?? ZERO;
+  const quantity = balance?.quantity ?? ZERO;
 
-  return balance ?? null;
+  return { held, lastEntryCost: balance?.lastEntryCost ?? null, owed: Prisma.Decimal.max(ZERO, held.sub(quantity)) };
 }
 
-export function zeroStockBalance(client: Prisma.TransactionClient, productSku: string) {
+// Writes off what is owed: the balance becomes what the lots hold.
+export function settleStockBalance(client: Prisma.TransactionClient, productSku: string, held: Prisma.Decimal) {
   return client.$executeRaw`
-    UPDATE product_stocks SET quantity = 0, updated_at = now() WHERE product_sku = ${productSku}::uuid
+    UPDATE product_stocks SET quantity = ${held}::numeric, updated_at = now() WHERE product_sku = ${productSku}::uuid
   `;
+}
+
+// What came into the stock together becomes a lot. `left` is for the lot that comes in already
+// partly spoken for; without it the whole quantity is there to take.
+export function openLot(
+  client: Prisma.TransactionClient,
+  lot: {
+    productSku: string;
+    quantity: Prisma.Decimal | string;
+    left?: Prisma.Decimal;
+    unitCost: Prisma.Decimal | string;
+    expiresAt: string | null;
+    supplierId?: string;
+  },
+) {
+  return client.stockLot.create({
+    data: {
+      productSku: lot.productSku,
+      supplierId: lot.supplierId,
+      expiresAt: lot.expiresAt === null ? null : new Date(lot.expiresAt),
+      initialQuantity: lot.quantity,
+      quantity: lot.left ?? lot.quantity,
+      unitCost: lot.unitCost,
+    },
+    select: { id: true, expiresAt: true, quantity: true, supplier: { select: { id: true, name: true } } },
+  });
+}
+
+type UsableLot = { id: string; quantity: Prisma.Decimal; unitCost: Prisma.Decimal; expiresAt: Date | null };
+
+// The lots a quantity may be taken from, in the order they are to be used: the first to expire
+// first, the ones that never expire last, and the one that came in earlier ahead of another
+// expiring on the same day. An expired lot is not among them: it leaves the stock as a loss, not
+// as an input.
+function usableLots(
+  client: Prisma.TransactionClient,
+  { productSku, today, lock }: { productSku: string; today: string; lock: boolean },
+) {
+  return client.$queryRaw<UsableLot[]>`
+    SELECT id, quantity, unit_cost AS "unitCost", expires_at AS "expiresAt"
+    FROM stock_lots
+    WHERE product_sku = ${productSku}::uuid
+      AND quantity > 0
+      AND (expires_at IS NULL OR (expires_at AT TIME ZONE 'UTC')::date >= ${today}::date)
+    ORDER BY expires_at ASC NULLS LAST, created_at ASC, id ASC
+    ${lock ? Prisma.sql`FOR UPDATE` : Prisma.empty}
+  `;
+}
+
+// Which lots a quantity would come from if it were taken now, and what they would not cover. It
+// takes nothing: by the time the stock really moves, the lots may be others.
+export async function suggestLots(input: { productSku: string; quantity: Prisma.Decimal; today: string }) {
+  const lots = await usableLots(prisma, { productSku: input.productSku, today: input.today, lock: false });
+
+  return allocate(lots, input.quantity);
+}
+
+type Take = { lotId: string | null; quantity: Prisma.Decimal; unitCost: Prisma.Decimal };
+
+// Takes a quantity out of the stock, lot by lot. What the lots do not cover is taken anyway and
+// stays owed, costing what the last lot taken from cost.
+export async function takeFromLots(
+  client: Prisma.TransactionClient,
+  input: { productSku: string; quantity: Prisma.Decimal; today: string },
+): Promise<Take[]> {
+  const { productSku, quantity, today } = input;
+  const balance = await lockStockBalance(client, productSku);
+
+  const lots = await usableLots(client, { productSku, today, lock: true });
+  const { takes, shortfall } = allocate(lots, quantity);
+
+  for (const { lot, quantity: taken } of takes) {
+    await client.stockLot.update({ where: { id: lot.id }, data: { quantity: { decrement: taken } } });
+  }
+
+  await decreaseStock(client, { productSku, quantity: quantity.toString() });
+
+  const taken: Take[] = takes.map(({ lot, quantity: amount }) => ({
+    lotId: lot.id,
+    quantity: amount,
+    unitCost: lot.unitCost,
+  }));
+
+  if (shortfall.gt(0)) {
+    const unitCost =
+      taken.at(-1)?.unitCost ?? (await newestLotCost(client, productSku)) ?? balance.lastEntryCost ?? ZERO;
+
+    taken.push({ lotId: null, quantity: shortfall, unitCost });
+  }
+
+  return taken;
+}
+
+async function newestLotCost(client: Prisma.TransactionClient, productSku: string) {
+  const lot = await client.stockLot.findFirst({
+    where: { productSku },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { unitCost: true },
+  });
+
+  return lot?.unitCost ?? null;
 }
 
 // Taking from the stock never fails for lack of balance: the balance goes negative and the next

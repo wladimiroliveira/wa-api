@@ -1,8 +1,10 @@
 import { FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { Permission } from "../../generated/prisma/index.js";
-import { messageSchema } from "../auth/auth.schemas.js";
+import { localToday, toDateString } from "../../lib/dates.js";
 import { toPage } from "../../lib/pagination.js";
+import { messageSchema } from "../auth/auth.schemas.js";
+import { suggestLots } from "../stock/stock.repository.js";
 import {
   findPreWeighingById,
   insertPreWeighing,
@@ -53,14 +55,25 @@ export default async function preWeighingsRoutes(app: FastifyInstance) {
         return reply.code(result.failure.code).send({ message: result.failure.message });
       }
 
-      return reply.send({
-        product: result.plan.product,
-        quantity: result.plan.quantity.toString(),
-        items: result.plan.items.map(({ product, plannedQuantity }) => ({
-          product,
-          plannedQuantity: plannedQuantity.toString(),
-        })),
-      });
+      const today = localToday();
+      const items = await Promise.all(
+        result.plan.items.map(async ({ product, plannedQuantity }) => {
+          const { takes, shortfall } = await suggestLots({ productSku: product.sku, quantity: plannedQuantity, today });
+
+          return {
+            product,
+            plannedQuantity: plannedQuantity.toString(),
+            lots: takes.map(({ lot, quantity }) => ({
+              id: lot.id,
+              expiresAt: lot.expiresAt === null ? null : toDateString(lot.expiresAt),
+              quantity: quantity.toString(),
+            })),
+            shortfall: shortfall.toString(),
+          };
+        }),
+      );
+
+      return reply.send({ product: result.plan.product, quantity: result.plan.quantity.toString(), items });
     },
   );
 

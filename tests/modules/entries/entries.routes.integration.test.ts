@@ -363,6 +363,68 @@ describe("POST /v1/entries", () => {
     });
   });
 
+  describe("on a product that owes more than its balance shows, because it still holds an expired lot", () => {
+    // 5 kg sit in an expired lot nothing may take from, and 2 kg more than the other lots held
+    // were used: the balance reads 3, and 2 are owed.
+    const owingBehindAnExpiredLot = async () => {
+      const product = await createProduct();
+      await testPrisma.productStock.create({
+        data: { productSku: product.sku, quantity: "3", lastEntryCost: "4", averageCost: "4" },
+      });
+      await testPrisma.stockLot.create({
+        data: {
+          productSku: product.sku,
+          quantity: "5",
+          initialQuantity: "5",
+          unitCost: "4",
+          expiresAt: new Date("2020-01-01"),
+        },
+      });
+
+      return product;
+    };
+
+    it("answers 409 with what is owed", async () => {
+      const { headers } = await authenticateAs(app, [Permission.ENTRIES_CREATE]);
+      const product = await owingBehindAnExpiredLot();
+
+      const response = await postEntry(headers, { productSku: product.sku, quantity: "10", unitCost: "6" });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().deficit).toBe("2");
+    });
+
+    it("brings the balance up to what the lots hold when told to", async () => {
+      const { headers } = await authenticateAs(app, [Permission.ENTRIES_CREATE]);
+      const product = await owingBehindAnExpiredLot();
+
+      const response = await postEntry(headers, {
+        productSku: product.sku,
+        quantity: "10",
+        unitCost: "6",
+        deficit: "ZERO",
+      });
+
+      expect(response.json().stock.quantity).toBe("15");
+      expect(response.json().lot.quantity).toBe("10");
+    });
+
+    it("takes what is owed out of the new lot when told to", async () => {
+      const { headers } = await authenticateAs(app, [Permission.ENTRIES_CREATE]);
+      const product = await owingBehindAnExpiredLot();
+
+      const response = await postEntry(headers, {
+        productSku: product.sku,
+        quantity: "10",
+        unitCost: "6",
+        deficit: "DISCOUNT",
+      });
+
+      expect(response.json().stock.quantity).toBe("13");
+      expect(response.json().lot.quantity).toBe("8");
+    });
+  });
+
   it("ignores the way of settling a negative balance when there is none", async () => {
     const { headers } = await authenticateAs(app, [Permission.ENTRIES_CREATE]);
     const product = await createProduct();
