@@ -1892,6 +1892,110 @@
         }
       }
     },
+    "/v1/stock": {
+      "get": {
+        "summary": "Posição de estoque de cada produto e o valor total em estoque",
+        "tags": [
+          "stock"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "product": {
+                            "type": "object",
+                            "properties": {
+                              "sku": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "unit": {
+                                "type": "string",
+                                "enum": [
+                                  "UNIT",
+                                  "KILOGRAM",
+                                  "GRAM",
+                                  "LITER",
+                                  "MILLILITER"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "sku",
+                              "description",
+                              "unit"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "quantity": {
+                            "type": "string"
+                          },
+                          "minimumQuantity": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "lastEntryCost": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "averageCost": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "NEGATIVE",
+                              "EMPTY",
+                              "BELOW_MINIMUM",
+                              "OK"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "product",
+                          "quantity",
+                          "minimumQuantity",
+                          "lastEntryCost",
+                          "averageCost",
+                          "value",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "totalValue": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "totalValue"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/products/{sku}/recipe": {
       "get": {
         "summary": "Consulta a receita de um produto",
