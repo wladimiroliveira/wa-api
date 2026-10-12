@@ -94,6 +94,7 @@ model Product {
   kind             ProductKind
   unit             MeasurementUnit
   stock            ProductStock?
+  lots             StockLot[]
   movements        StockMovement[]
   recipe           Recipe?
   usedIn           RecipeIngredient[]
@@ -109,10 +110,11 @@ model Product {
 }
 
 model Supplier {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  name      String   @unique
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id        String     @id @default(uuid(7)) @db.Uuid
+  name      String     @unique
+  lots      StockLot[]
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("suppliers")
 }
@@ -133,6 +135,7 @@ enum StockMovementType {
   ENTRY
   PRODUCTION_CONSUMPTION
   PRODUCTION_OUTPUT
+  BALANCE_ADJUSTMENT
 
   @@map("stock_movement_type")
 }
@@ -141,6 +144,8 @@ model StockMovement {
   id          String            @id @default(uuid(7)) @db.Uuid
   productSku  String            @map("product_sku") @db.Uuid
   product     Product           @relation(fields: [productSku], references: [sku], onDelete: Restrict)
+  lotId       String?           @map("lot_id") @db.Uuid
+  lot         StockLot?         @relation(fields: [lotId], references: [id], onDelete: Restrict)
   type        StockMovementType
   quantity    Decimal           @db.Decimal(18, 6)
   unitCost    Decimal           @map("unit_cost") @db.Decimal(18, 6)
@@ -149,7 +154,30 @@ model StockMovement {
   createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
 
   @@index([productSku, createdAt(sort: Desc), id(sort: Desc)], map: "idx_stock_movements_product_sku_created_at")
+  @@index([lotId], map: "idx_stock_movements_lot_id")
   @@map("stock_movements")
+}
+
+// What came into the stock together: one entry, one lot. `quantity` is what is left of it, and the
+// lots of a product add up to its balance whenever that balance is not negative. `expiresAt` is a
+// calendar day, kept as its midnight in UTC.
+model StockLot {
+  id              String          @id @default(uuid(7)) @db.Uuid
+  productSku      String          @map("product_sku") @db.Uuid
+  product         Product         @relation(fields: [productSku], references: [sku], onDelete: Restrict)
+  supplierId      String?         @map("supplier_id") @db.Uuid
+  supplier        Supplier?       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  expiresAt       DateTime?       @map("expires_at") @db.Timestamptz(3)
+  initialQuantity Decimal         @map("initial_quantity") @db.Decimal(18, 6)
+  quantity        Decimal         @db.Decimal(18, 6)
+  unitCost        Decimal         @map("unit_cost") @db.Decimal(18, 6)
+  movements       StockMovement[]
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([productSku, expiresAt, createdAt], map: "idx_stock_lots_product_sku_expires_at")
+  @@index([supplierId], map: "idx_stock_lots_supplier_id")
+  @@map("stock_lots")
 }
 
 model Recipe {

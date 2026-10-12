@@ -26,7 +26,7 @@ describe("stock schema", () => {
     );
   });
 
-  it("knows the entry and the two movements of a production", () => {
+  it("knows the entry, the two movements of a production and the adjustment of a balance", () => {
     const block = /enum StockMovementType \{([\s\S]*?)\n\}/.exec(SCHEMA);
     expect(block).not.toBeNull();
 
@@ -35,7 +35,7 @@ describe("stock schema", () => {
       .map((line) => line.trim())
       .filter((line) => line !== "" && !line.startsWith("@@"));
 
-    expect(values).toEqual(["ENTRY", "PRODUCTION_CONSUMPTION", "PRODUCTION_OUTPUT"]);
+    expect(values).toEqual(["ENTRY", "PRODUCTION_CONSUMPTION", "PRODUCTION_OUTPUT", "BALANCE_ADJUSTMENT"]);
     expect(SCHEMA).toMatch(/enum StockMovementType \{[\s\S]*?@@map\("stock_movement_type"\)/);
   });
 
@@ -52,5 +52,25 @@ describe("stock schema", () => {
     expect(SCHEMA).toContain(
       `@@index([productSku, createdAt(sort: Desc), id(sort: Desc)], map: "idx_stock_movements_product_sku_created_at")`,
     );
+  });
+
+  it("keeps what came in together as a lot, with what is left of it and what it cost", () => {
+    expect(SCHEMA).toMatch(/model StockLot \{[\s\S]*?@@map\("stock_lots"\)/);
+    expect(SCHEMA).toMatch(
+      fieldOf("StockLot", String.raw`initialQuantity\s+Decimal\s+@map\("initial_quantity"\) @db\.Decimal\(18, 6\)`),
+    );
+    expect(SCHEMA).toMatch(fieldOf("StockLot", String.raw`quantity\s+Decimal\s+@db\.Decimal\(18, 6\)`));
+    expect(SCHEMA).toMatch(
+      fieldOf("StockLot", String.raw`unitCost\s+Decimal\s+@map\("unit_cost"\) @db\.Decimal\(18, 6\)`),
+    );
+  });
+
+  it("lets a lot have no expiry date and no supplier", () => {
+    expect(SCHEMA).toMatch(fieldOf("StockLot", String.raw`expiresAt\s+DateTime\?\s+@map\("expires_at"\)`));
+    expect(SCHEMA).toMatch(fieldOf("StockLot", String.raw`supplierId\s+String\?\s+@map\("supplier_id"\) @db\.Uuid`));
+  });
+
+  it("ties a movement to the lot it moved, when it moved one", () => {
+    expect(SCHEMA).toMatch(fieldOf("StockMovement", String.raw`lotId\s+String\?\s+@map\("lot_id"\) @db\.Uuid`));
   });
 });

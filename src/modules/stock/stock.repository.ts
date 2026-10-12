@@ -28,6 +28,25 @@ export function increaseStock(
   `;
 }
 
+// Reads the balance of a product and holds it until the transaction ends, so whatever is decided
+// from it is still true when it is written. Null for a product that never moved.
+export async function lockStockBalance(client: Prisma.TransactionClient, productSku: string) {
+  const [balance] = await client.$queryRaw<{ quantity: Prisma.Decimal; lastEntryCost: Prisma.Decimal | null }[]>`
+    SELECT quantity, last_entry_cost AS "lastEntryCost"
+    FROM product_stocks
+    WHERE product_sku = ${productSku}::uuid
+    FOR UPDATE
+  `;
+
+  return balance ?? null;
+}
+
+export function zeroStockBalance(client: Prisma.TransactionClient, productSku: string) {
+  return client.$executeRaw`
+    UPDATE product_stocks SET quantity = 0, updated_at = now() WHERE product_sku = ${productSku}::uuid
+  `;
+}
+
 // Taking from the stock never fails for lack of balance: the balance goes negative and the next
 // entry settles it. The average cost is what each unit taken is worth, and it stays as it was.
 export function decreaseStock(client: Prisma.TransactionClient, input: { productSku: string; quantity: string }) {
