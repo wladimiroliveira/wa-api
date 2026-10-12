@@ -1,4 +1,5 @@
 import { Prisma, ProductionStatus } from "../../generated/prisma/index.js";
+import { localToday } from "../../lib/dates.js";
 import { toStoredDecimal } from "../../lib/decimal.js";
 import { findPreWeighingById } from "../pre-weighings/pre-weighings.repository.js";
 import { planPreWeighing } from "../pre-weighings/pre-weighings.service.js";
@@ -98,12 +99,13 @@ export async function startProduction(input: {
   }
 }
 
-// Finishing is where the stock moves: every input leaves at the average cost of that moment, and
-// each product comes in costing what its inputs cost, spread over what was really produced.
+// Finishing is where the stock moves: every input leaves the lots that expire first, at what each
+// of them cost, and each product comes in as a lot costing what its inputs cost, spread over what
+// was really produced.
 export async function finishProduction(input: {
   id: string;
   createdById: string;
-  items: { id: string; producedQuantity: string }[];
+  items: { id: string; producedQuantity: string; expiresAt: string | null }[];
 }): Promise<ProductionResult> {
   const { id, createdById } = input;
   const production = await findProductionById(id);
@@ -111,29 +113,32 @@ export async function finishProduction(input: {
   if (production === null) return notFound;
   if (production.status !== ProductionStatus.IN_PROGRESS) return notInProgress;
 
-  const producedById = new Map(input.items.map((item) => [item.id.toLowerCase(), item.producedQuantity]));
+  const producedById = new Map(input.items.map((item) => [item.id.toLowerCase(), item]));
 
   if (production.items.length !== producedById.size || production.items.some((item) => !producedById.has(item.id))) {
     return failure(409, "The items do not match the items of the production.");
   }
 
   try {
+    const today = localToday();
+
     await inProductionTransaction(async (tx) => {
       if (!(await markProductionFinished(tx, id))) throw new ProductionAborted(notInProgress);
 
       for (const item of production.items) {
-        const producedQuantity = producedById.get(item.id)!;
+        const { producedQuantity, expiresAt } = producedById.get(item.id)!;
         let inputsCost = new Prisma.Decimal(0);
 
         for (const { id: inputId, product, quantity } of item.inputs) {
-          const unitCost = await consumeProductionInput(tx, {
+          const cost = await consumeProductionInput(tx, {
             id: inputId,
             productSku: product.sku,
             quantity,
             createdById,
+            today,
           });
 
-          inputsCost = inputsCost.add(quantity.mul(unitCost));
+          inputsCost = inputsCost.add(cost);
         }
 
         const unitCost = toStoredDecimal(inputsCost.div(producedQuantity));
@@ -147,6 +152,7 @@ export async function finishProduction(input: {
           productSku: item.product.sku,
           quantity: producedQuantity,
           unitCost,
+          expiresAt,
           createdById,
         });
       }

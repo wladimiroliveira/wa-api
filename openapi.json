@@ -2861,11 +2861,44 @@
                           },
                           "plannedQuantity": {
                             "type": "string"
+                          },
+                          "lots": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "expiresAt": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                },
+                                "quantity": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "expiresAt",
+                                "quantity"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "shortfall": {
+                            "type": "string"
                           }
                         },
                         "required": [
                           "product",
-                          "plannedQuantity"
+                          "plannedQuantity",
+                          "lots",
+                          "shortfall"
                         ],
                         "additionalProperties": false
                       }
@@ -4199,11 +4232,18 @@
                         "producedQuantity": {
                           "type": "string",
                           "pattern": "^\\d{1,12}(\\.\\d{1,6})?$"
+                        },
+                        "expiresAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                         }
                       },
                       "required": [
                         "id",
-                        "producedQuantity"
+                        "producedQuantity",
+                        "expiresAt"
                       ]
                     }
                   }

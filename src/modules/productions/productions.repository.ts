@@ -1,7 +1,7 @@
 import { Prisma, ProductionStatus, StockMovementType } from "../../generated/prisma/index.js";
 import { pageArgs } from "../../lib/pagination.js";
 import { prisma } from "../../lib/prisma.js";
-import { decreaseStock, increaseStock } from "../stock/stock.repository.js";
+import { increaseStock, openLot, takeFromLots } from "../stock/stock.repository.js";
 
 const productSelect = { sku: true, description: true, unit: true } satisfies Prisma.ProductSelect;
 
@@ -88,32 +88,44 @@ export function releasePreWeighings(tx: Prisma.TransactionClient, productionId: 
   return tx.productionItem.updateMany({ where: { productionId }, data: { preWeighingId: null } });
 }
 
-// Takes an input from the stock and answers what each unit of it was worth. One that never
-// entered the stock has no cost to count.
+// Takes an input from the stock, lot by lot, and answers what all of it cost. Each lot taken from
+// is a movement of its own, at the cost of that lot; the input keeps what a unit of it came to.
 export async function consumeProductionInput(
   tx: Prisma.TransactionClient,
-  input: { id: string; productSku: string; quantity: Prisma.Decimal; createdById: string },
+  input: { id: string; productSku: string; quantity: Prisma.Decimal; createdById: string; today: string },
 ) {
-  const { id, ...movement } = input;
-  const [stock] = await decreaseStock(tx, { productSku: input.productSku, quantity: input.quantity.toString() });
-  const unitCost = stock.averageCost ?? new Prisma.Decimal(0);
+  const { id, productSku, quantity, createdById, today } = input;
+  const takes = await takeFromLots(tx, { productSku, quantity, today });
 
-  await tx.stockMovement.create({ data: { ...movement, unitCost, type: StockMovementType.PRODUCTION_CONSUMPTION } });
-  await tx.productionItemInput.update({ where: { id }, data: { unitCost } });
+  await tx.stockMovement.createMany({
+    data: takes.map((take) => ({ ...take, productSku, createdById, type: StockMovementType.PRODUCTION_CONSUMPTION })),
+  });
 
-  return unitCost;
+  const cost = Prisma.Decimal.sum(0, ...takes.map((take) => take.quantity.mul(take.unitCost)));
+
+  await tx.productionItemInput.update({ where: { id }, data: { unitCost: cost.div(quantity).toDecimalPlaces(6) } });
+
+  return cost;
 }
 
+// What was produced comes in as a lot of its own, costing what its inputs cost.
 export async function outputProductionItem(
   tx: Prisma.TransactionClient,
-  item: { id: string; productSku: string; quantity: string; unitCost: Prisma.Decimal; createdById: string },
+  item: {
+    id: string;
+    productSku: string;
+    quantity: string;
+    unitCost: Prisma.Decimal;
+    expiresAt: string | null;
+    createdById: string;
+  },
 ) {
-  const { id, ...movement } = item;
+  const { id, productSku, quantity, unitCost, expiresAt, createdById } = item;
+  const lot = await openLot(tx, { productSku, quantity, unitCost, expiresAt });
 
-  await tx.stockMovement.create({ data: { ...movement, type: StockMovementType.PRODUCTION_OUTPUT } });
-  await increaseStock(tx, { ...movement, unitCost: item.unitCost.toString() });
-  await tx.productionItem.update({
-    where: { id },
-    data: { producedQuantity: item.quantity, unitCost: item.unitCost },
+  await tx.stockMovement.create({
+    data: { productSku, quantity, unitCost, createdById, lotId: lot.id, type: StockMovementType.PRODUCTION_OUTPUT },
   });
+  await increaseStock(tx, { productSku, quantity, unitCost: unitCost.toString() });
+  await tx.productionItem.update({ where: { id }, data: { producedQuantity: quantity, unitCost } });
 }

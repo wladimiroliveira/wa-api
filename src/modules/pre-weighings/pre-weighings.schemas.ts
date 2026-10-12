@@ -29,7 +29,15 @@ export const listPreWeighingsQuerySchema = pageQuerySchema.extend({
 export const preWeighingPlanSchema = z.object({
   product: productSummarySchema,
   quantity: z.string(),
-  items: z.array(z.object({ product: productSummarySchema, plannedQuantity: z.string() })),
+  items: z.array(
+    z.object({
+      product: productSummarySchema,
+      plannedQuantity: z.string(),
+      // Where to weigh it from, as the stock stands now, and what the stock does not have.
+      lots: z.array(z.object({ id: z.uuid(), expiresAt: z.iso.date().nullable(), quantity: z.string() })),
+      shortfall: z.string(),
+    }),
+  ),
 });
 
 export const preWeighingSchema = z.object({

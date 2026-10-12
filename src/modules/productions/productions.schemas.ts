@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lotExpirySchema } from "../stock/stock.schemas.js";
 import { ProductionStatus } from "../../generated/prisma/index.js";
 import { positiveDecimalSchema } from "../../lib/decimal.js";
 import { pageQuerySchema, pageSchema } from "../../lib/pagination.js";
@@ -25,7 +26,7 @@ export const startProductionBodySchema = z.object({
 
 export const finishProductionBodySchema = z.object({
   items: z
-    .array(z.object({ id: z.uuid(), producedQuantity: positiveDecimalSchema }))
+    .array(z.object({ id: z.uuid(), producedQuantity: positiveDecimalSchema, expiresAt: lotExpirySchema }))
     .min(1)
     .refine((items) => listsEachOnce(items.map(({ id }) => id)), { message: "An item is listed more than once." }),
 });

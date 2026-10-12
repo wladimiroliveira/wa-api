@@ -1,6 +1,6 @@
 import { Prisma, StockMovementType } from "../../generated/prisma/index.js";
 import { prisma } from "../../lib/prisma.js";
-import { increaseStock, lockStockBalance, zeroStockBalance } from "../stock/stock.repository.js";
+import { increaseStock, lockStockBalance, openLot, settleStockBalance } from "../stock/stock.repository.js";
 import { DeficitSettlement } from "./entries.schemas.js";
 
 export function findProductBySku(sku: string) {
@@ -34,20 +34,19 @@ export function insertEntry(input: {
   const { productSku, quantity, unitCost, createdById } = input;
 
   return prisma.$transaction(async (tx) => {
-    const balance = await lockStockBalance(tx, productSku);
-    const owed = balance !== null && balance.quantity.lt(0) ? balance.quantity.neg() : ZERO;
+    const { owed, held, lastEntryCost } = await lockStockBalance(tx, productSku);
 
     if (owed.gt(0) && input.deficit === undefined) throw new NegativeBalancePendingError(owed);
 
     if (owed.gt(0) && input.deficit === DeficitSettlement.ZERO) {
-      await zeroStockBalance(tx, productSku);
+      await settleStockBalance(tx, productSku, held);
       await tx.stockMovement.create({
         data: {
           productSku,
           createdById,
           type: StockMovementType.BALANCE_ADJUSTMENT,
           quantity: owed,
-          unitCost: balance?.lastEntryCost ?? ZERO,
+          unitCost: lastEntryCost ?? ZERO,
         },
       });
     }
@@ -56,18 +55,15 @@ export function insertEntry(input: {
 
     // Still owed at this point means the entry pays for it: the lot keeps only what is left.
     const left =
-      input.deficit === DeficitSettlement.DISCOUNT ? Prisma.Decimal.max(ZERO, owed.neg().add(quantity)) : quantity;
+      input.deficit === DeficitSettlement.DISCOUNT ? Prisma.Decimal.max(ZERO, owed.neg().add(quantity)) : undefined;
 
-    const lot = await tx.stockLot.create({
-      data: {
-        productSku,
-        supplierId: input.supplierId,
-        expiresAt: input.expiresAt === null ? null : new Date(input.expiresAt),
-        initialQuantity: quantity,
-        quantity: left,
-        unitCost,
-      },
-      select: { id: true, expiresAt: true, quantity: true, supplier: { select: { id: true, name: true } } },
+    const lot = await openLot(tx, {
+      productSku,
+      quantity,
+      left,
+      unitCost,
+      expiresAt: input.expiresAt,
+      supplierId: input.supplierId,
     });
 
     const movement = await tx.stockMovement.create({

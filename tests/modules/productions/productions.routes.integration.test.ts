@@ -89,8 +89,43 @@ async function createDoughPreWeighing(userId: string) {
   return { ...products, preWeighing };
 }
 
-const stock = (productSku: string, quantity: string, averageCost: string) =>
-  testPrisma.productStock.create({ data: { productSku, quantity, averageCost, lastEntryCost: averageCost } });
+// A balance is held in lots, so the stock is given one lot that never expires holding all of it.
+async function stock(productSku: string, quantity: string, averageCost: string) {
+  await testPrisma.productStock.create({ data: { productSku, quantity, averageCost, lastEntryCost: averageCost } });
+  await lot(productSku, quantity, averageCost);
+}
+
+const daysFromToday = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
+const lot = (productSku: string, quantity: string, unitCost: string, expiresAt: string | null = null) =>
+  testPrisma.stockLot.create({
+    data: {
+      productSku,
+      quantity,
+      unitCost,
+      initialQuantity: quantity,
+      expiresAt: expiresAt === null ? null : new Date(expiresAt),
+    },
+  });
+
+// A product held in several lots: the balance is their sum, and its average cost is not what the
+// tests are about.
+async function stockInLots(productSku: string, lots: [quantity: string, unitCost: string, expiresAt: string | null][]) {
+  const total = lots.reduce((sum, [quantity]) => sum + Number(quantity), 0);
+  await testPrisma.productStock.create({
+    data: { productSku, quantity: String(total), averageCost: "1", lastEntryCost: "1" },
+  });
+
+  return Promise.all(lots.map(([quantity, unitCost, expiresAt]) => lot(productSku, quantity, unitCost, expiresAt)));
+}
+
+const lotQuantity = async (id: string) =>
+  (await testPrisma.stockLot.findUniqueOrThrow({ where: { id } })).quantity.toString();
 
 async function stockOf(productSku: string) {
   const found = await testPrisma.productStock.findUnique({ where: { productSku } });
@@ -112,8 +147,20 @@ const postCancel = (headers: Headers, id: string) =>
 const listProductions = (headers: Headers, query: Record<string, string> = {}) =>
   app.inject({ method: "GET", url: "/v1/productions", headers, query });
 
-const postFinish = (headers: Headers, id: string, payload: Record<string, unknown>) =>
-  app.inject({ method: "POST", url: `/v1/productions/${id}/finish`, headers, payload });
+// Every finished item says whether what it produced expires; the tests that are not about it say
+// it does not.
+const postFinish = (headers: Headers, id: string, payload: { items?: unknown[] }) =>
+  app.inject({
+    method: "POST",
+    url: `/v1/productions/${id}/finish`,
+    headers,
+    payload: {
+      ...payload,
+      items: payload.items?.map((item) =>
+        typeof item === "object" && item !== null ? { expiresAt: null, ...item } : item,
+      ),
+    },
+  });
 
 const canRead = () => authenticateAs(app, [Permission.PRODUCTION_READ]);
 const canCreate = () => authenticateAs(app, [Permission.PRODUCTION_CREATE]);
@@ -445,6 +492,198 @@ describe("POST /v1/productions/:id/finish", () => {
     expect(response.json().items[0].unitCost).toBe("1.2");
     expect(await stockOf(flour.sku)).toEqual({ quantity: "-20", averageCost: "2" });
     expect(await stockOf(water.sku)).toEqual({ quantity: "-18", averageCost: null });
+  });
+
+  describe("taking the inputs from the lots", () => {
+    // 5 L of syrup takes 2 kg of sugar.
+    async function startSyrup(headers: Headers, lots: [string, string, string | null][]) {
+      const products = await createSyrup();
+      const sugarLots = await stockInLots(products.sugar.sku, lots);
+      const started = await postProduction(headers, { items: [{ productSku: products.syrup.sku, quantity: "5" }] });
+
+      return { ...products, sugarLots, production: started.json() };
+    }
+
+    const finish = (headers: Headers, production: { id: string; items: { id: string }[] }, produced = "5") =>
+      postFinish(headers, production.id, { items: [{ id: production.items[0].id, producedQuantity: produced }] });
+
+    const consumptionsOf = async (productSku: string) =>
+      (
+        await testPrisma.stockMovement.findMany({
+          where: { productSku, type: "PRODUCTION_CONSUMPTION" },
+          orderBy: { quantity: "asc" },
+        })
+      ).map((movement) => ({
+        lotId: movement.lotId,
+        quantity: movement.quantity.toString(),
+        unitCost: movement.unitCost.toString(),
+      }));
+
+    it("takes from the lot that expires first, whatever the order they came in", async () => {
+      const { headers } = await canDoBoth();
+      const { sugar, sugarLots, production } = await startSyrup(headers, [
+        ["10", "3", daysFromToday(90)],
+        ["10", "5", daysFromToday(20)],
+        ["10", "7", null],
+      ]);
+      const [later, sooner, never] = sugarLots;
+
+      const response = await finish(headers, production);
+
+      expect(response.statusCode).toBe(200);
+      expect(await lotQuantity(sooner.id)).toBe("8");
+      expect(await lotQuantity(later.id)).toBe("10");
+      expect(await lotQuantity(never.id)).toBe("10");
+      expect(await consumptionsOf(sugar.sku)).toEqual([{ lotId: sooner.id, quantity: "2", unitCost: "5" }]);
+      expect(response.json().items[0].inputs[0].unitCost).toBe("5");
+      expect(response.json().items[0].unitCost).toBe("2");
+    });
+
+    it("moves on to the next lot when one does not cover it, costing each part at its own lot", async () => {
+      const { headers } = await canDoBoth();
+      const { sugar, sugarLots, production } = await startSyrup(headers, [
+        ["0.5", "4", daysFromToday(20)],
+        ["10", "8", daysFromToday(90)],
+      ]);
+      const [sooner, later] = sugarLots;
+
+      const response = await finish(headers, production);
+
+      expect(await lotQuantity(sooner.id)).toBe("0");
+      expect(await lotQuantity(later.id)).toBe("8.5");
+      expect(await consumptionsOf(sugar.sku)).toEqual([
+        { lotId: sooner.id, quantity: "0.5", unitCost: "4" },
+        { lotId: later.id, quantity: "1.5", unitCost: "8" },
+      ]);
+      // 0.5 at 4 and 1.5 at 8 are 14.00 for 2 kg, and for 5 L of syrup.
+      expect(response.json().items[0].inputs[0].unitCost).toBe("7");
+      expect(response.json().items[0].unitCost).toBe("2.8");
+      expect(await stockOf(sugar.sku)).toMatchObject({ quantity: "8.5" });
+    });
+
+    it("takes first from the lot that came in first when two expire on the same day", async () => {
+      const { headers } = await canDoBoth();
+      const { sugarLots, production } = await startSyrup(headers, [
+        ["10", "3", daysFromToday(20)],
+        ["10", "5", daysFromToday(20)],
+      ]);
+
+      await finish(headers, production);
+
+      expect(await lotQuantity(sugarLots[0].id)).toBe("8");
+      expect(await lotQuantity(sugarLots[1].id)).toBe("10");
+    });
+
+    it("takes from a lot that expires today, and leaves an expired one alone", async () => {
+      const { headers } = await canDoBoth();
+      const { sugarLots, production } = await startSyrup(headers, [
+        ["10", "3", daysFromToday(-1)],
+        ["1", "5", daysFromToday(0)],
+        ["10", "7", daysFromToday(60)],
+      ]);
+      const [expired, today, later] = sugarLots;
+
+      await finish(headers, production);
+
+      expect(await lotQuantity(expired.id)).toBe("10");
+      expect(await lotQuantity(today.id)).toBe("0");
+      expect(await lotQuantity(later.id)).toBe("9");
+    });
+
+    it("empties every lot and leaves the rest owed, at the cost of the last lot it took from", async () => {
+      const { headers } = await canDoBoth();
+      const { sugar, sugarLots, production } = await startSyrup(headers, [
+        ["0.5", "4", daysFromToday(20)],
+        ["1", "8", daysFromToday(90)],
+      ]);
+
+      const response = await finish(headers, production);
+
+      expect(response.statusCode).toBe(200);
+      expect(await lotQuantity(sugarLots[0].id)).toBe("0");
+      expect(await lotQuantity(sugarLots[1].id)).toBe("0");
+      expect(await stockOf(sugar.sku)).toMatchObject({ quantity: "-0.5" });
+      expect(await consumptionsOf(sugar.sku)).toEqual([
+        { lotId: sugarLots[0].id, quantity: "0.5", unitCost: "4" },
+        { lotId: null, quantity: "0.5", unitCost: "8" },
+        { lotId: sugarLots[1].id, quantity: "1", unitCost: "8" },
+      ]);
+      // 0.5 at 4, 1 at 8 and the 0.5 owed at 8 are 14.00 for 2 kg.
+      expect(response.json().items[0].inputs[0].unitCost).toBe("7");
+    });
+
+    it("costs what is owed at the newest lot the product had when no lot is left to take from", async () => {
+      const { headers } = await canDoBoth();
+      const { sugar, production } = await startSyrup(headers, [["10", "3", daysFromToday(-1)]]);
+      await testPrisma.stockLot.create({
+        data: { productSku: sugar.sku, quantity: "0", initialQuantity: "5", unitCost: "6" },
+      });
+
+      const response = await finish(headers, production);
+
+      expect(await consumptionsOf(sugar.sku)).toEqual([{ lotId: null, quantity: "2", unitCost: "6" }]);
+      expect(response.json().items[0].inputs[0].unitCost).toBe("6");
+    });
+  });
+
+  describe("bringing the product in as a lot", () => {
+    it("opens a lot of what was produced, with its expiry date and what it cost", async () => {
+      const { headers } = await canDoBoth();
+      const { dough, production } = await startDough(headers);
+
+      const response = await postFinish(headers, production.id, {
+        items: [{ id: production.items[0].id, producedQuantity: "46", expiresAt: daysFromToday(3) }],
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const [produced] = await testPrisma.stockLot.findMany({ where: { productSku: dough.sku } });
+
+      expect(produced).toMatchObject({ supplierId: null });
+      expect(produced.expiresAt?.toISOString().slice(0, 10)).toBe(daysFromToday(3));
+      expect(produced.initialQuantity.toString()).toBe("46");
+      expect(produced.quantity.toString()).toBe("46");
+      expect(produced.unitCost.toString()).toBe("1.5");
+      expect((await testPrisma.stockMovement.findFirstOrThrow({ where: { type: "PRODUCTION_OUTPUT" } })).lotId).toBe(
+        produced.id,
+      );
+    });
+
+    it("opens a lot that never expires when told so", async () => {
+      const { headers } = await canDoBoth();
+      const { dough, production } = await startDough(headers);
+
+      await postFinish(headers, production.id, {
+        items: [{ id: production.items[0].id, producedQuantity: "46", expiresAt: null }],
+      });
+
+      expect((await testPrisma.stockLot.findFirstOrThrow({ where: { productSku: dough.sku } })).expiresAt).toBeNull();
+    });
+
+    it("answers 400 when an item does not say whether what it produced expires", async () => {
+      const { headers } = await canDoBoth();
+      const { production } = await startDough(headers);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/productions/${production.id}/finish`,
+        headers,
+        payload: { items: [{ id: production.items[0].id, producedQuantity: "46" }] },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("answers 400 for a product that would come in already expired", async () => {
+      const { headers } = await canDoBoth();
+      const { production } = await startDough(headers);
+
+      const response = await postFinish(headers, production.id, {
+        items: [{ id: production.items[0].id, producedQuantity: "46", expiresAt: daysFromToday(-1) }],
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
   });
 
   it("weights what it produced into the average cost of the product already in stock", async () => {

@@ -1,9 +1,17 @@
 import { z } from "zod";
 import { StockMovementType } from "../../generated/prisma/index.js";
+import { localToday } from "../../lib/dates.js";
 import { pageQuerySchema, pageSchema } from "../../lib/pagination.js";
 import { productSummarySchema } from "../products/products.schemas.js";
 import { supplierSchema } from "../suppliers/suppliers.schemas.js";
 import { LotStatus, StockStatus } from "./stock.position.js";
+
+// The day a lot expires on, or null for one that never does. It is asked for, never assumed: a lot
+// with no expiry is said so rather than implied by a field left out.
+export const lotExpirySchema = z.iso
+  .date()
+  .refine((date) => date >= localToday(), { message: "The lot has already expired." })
+  .nullable();
 
 export const listStockMovementsQuerySchema = pageQuerySchema.extend({ productSku: z.uuid().optional() });
 

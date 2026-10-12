@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { StockMovementType } from "../../generated/prisma/index.js";
-import { localToday } from "../../lib/dates.js";
 import { decimalSchema, positiveDecimalSchema } from "../../lib/decimal.js";
 import { productSummarySchema } from "../products/products.schemas.js";
+import { lotExpirySchema } from "../stock/stock.schemas.js";
 import { supplierSchema } from "../suppliers/suppliers.schemas.js";
 
 // How an entry settles a balance that went negative: bring it to zero first, so the whole entry is
@@ -15,12 +15,7 @@ export const createEntryBodySchema = z.object({
   productSku: z.uuid(),
   quantity: positiveDecimalSchema,
   unitCost: decimalSchema,
-  // Not optional on purpose: a lot that never expires is said so, with null, rather than assumed
-  // from a field left out.
-  expiresAt: z.iso
-    .date()
-    .refine((date) => date >= localToday(), { message: "The lot has already expired." })
-    .nullable(),
+  expiresAt: lotExpirySchema,
   supplierId: z.uuid().optional(),
   deficit: z.enum(DeficitSettlement).optional(),
 });
