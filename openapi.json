@@ -1699,12 +1699,31 @@
                   "unitCost": {
                     "type": "string",
                     "pattern": "^\\d{1,12}(\\.\\d{1,6})?$"
+                  },
+                  "expiresAt": {
+                    "nullable": true,
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "supplierId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "deficit": {
+                    "type": "string",
+                    "enum": [
+                      "ZERO",
+                      "DISCOUNT"
+                    ]
                   }
                 },
                 "required": [
                   "productSku",
                   "quantity",
-                  "unitCost"
+                  "unitCost",
+                  "expiresAt"
                 ]
               }
             }
@@ -1728,7 +1747,8 @@
                       "enum": [
                         "ENTRY",
                         "PRODUCTION_CONSUMPTION",
-                        "PRODUCTION_OUTPUT"
+                        "PRODUCTION_OUTPUT",
+                        "BALANCE_ADJUSTMENT"
                       ]
                     },
                     "quantity": {
@@ -1771,6 +1791,51 @@
                       ],
                       "additionalProperties": false
                     },
+                    "lot": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "expiresAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        },
+                        "supplier": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "quantity": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "expiresAt",
+                        "supplier",
+                        "quantity"
+                      ],
+                      "additionalProperties": false
+                    },
                     "stock": {
                       "type": "object",
                       "properties": {
@@ -1799,6 +1864,7 @@
                     "unitCost",
                     "createdAt",
                     "product",
+                    "lot",
                     "stock"
                   ],
                   "additionalProperties": false
@@ -1833,6 +1899,9 @@
                   "type": "object",
                   "properties": {
                     "message": {
+                      "type": "string"
+                    },
+                    "deficit": {
                       "type": "string"
                     }
                   },
@@ -1909,7 +1978,8 @@
                             "enum": [
                               "ENTRY",
                               "PRODUCTION_CONSUMPTION",
-                              "PRODUCTION_OUTPUT"
+                              "PRODUCTION_OUTPUT",
+                              "BALANCE_ADJUSTMENT"
                             ]
                           },
                           "quantity": {
