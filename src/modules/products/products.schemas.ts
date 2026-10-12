@@ -14,5 +14,15 @@ export const productSchema = productSummarySchema.extend({
   isActive: z.boolean(),
 });
 
+export const createProductBodySchema = z.object({
+  description: z.string().trim().min(1).max(120),
+  kind: z.enum(ProductKind),
+  unit: z.enum(MeasurementUnit),
+  gtin: z
+    .string()
+    .regex(/^\d{8,14}$/)
+    .optional(),
+});
+
 export const listsEachProductOnce = (items: { productSku: string }[]) =>
   new Set(items.map(({ productSku }) => productSku.toLowerCase())).size === items.length;

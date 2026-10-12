@@ -1439,6 +1439,129 @@
             }
           }
         }
+      },
+      "post": {
+        "summary": "Cadastra um produto",
+        "tags": [
+          "products"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "GOODS",
+                      "MANUFACTURED"
+                    ]
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "UNIT",
+                      "KILOGRAM",
+                      "GRAM",
+                      "LITER",
+                      "MILLILITER"
+                    ]
+                  },
+                  "gtin": {
+                    "type": "string",
+                    "pattern": "^\\d{8,14}$"
+                  }
+                },
+                "required": [
+                  "description",
+                  "kind",
+                  "unit"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sku": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "enum": [
+                        "UNIT",
+                        "KILOGRAM",
+                        "GRAM",
+                        "LITER",
+                        "MILLILITER"
+                      ]
+                    },
+                    "gtin": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "GOODS",
+                        "MANUFACTURED"
+                      ]
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "sku",
+                    "description",
+                    "unit",
+                    "gtin",
+                    "kind",
+                    "isActive"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/entries": {

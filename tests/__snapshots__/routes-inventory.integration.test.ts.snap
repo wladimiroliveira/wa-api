@@ -35,6 +35,7 @@ POST /v1/pre-weighings -> PRODUCTION_CREATE
 POST /v1/productions -> PRODUCTION_CREATE
 POST /v1/productions/:id/cancel -> PRODUCTION_CREATE
 POST /v1/productions/:id/finish -> PRODUCTION_CREATE
+POST /v1/products -> CATALOG_CREATE
 POST /v1/roles -> ACCESS_CREATE
 POST /v1/sessions/refresh -> public
 POST /v1/sessions/signin -> public
