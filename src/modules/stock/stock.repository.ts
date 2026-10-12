@@ -1,4 +1,6 @@
 import { Prisma } from "../../generated/prisma/index.js";
+import { pageArgs } from "../../lib/pagination.js";
+import { prisma } from "../../lib/prisma.js";
 
 type StockAfterIncrease = { quantity: Prisma.Decimal; lastEntryCost: Prisma.Decimal; averageCost: Prisma.Decimal };
 
@@ -37,4 +39,22 @@ export function decreaseStock(client: Prisma.TransactionClient, input: { product
       updated_at = now()
     RETURNING average_cost AS "averageCost"
   `;
+}
+
+export function listStockMovements(query: { productSku?: string; limit: number; cursor?: string }) {
+  const { productSku, ...page } = query;
+
+  return prisma.stockMovement.findMany({
+    where: { productSku },
+    select: {
+      id: true,
+      type: true,
+      quantity: true,
+      unitCost: true,
+      createdAt: true,
+      product: { select: { sku: true, description: true, unit: true } },
+      createdBy: { select: { id: true, name: true } },
+    },
+    ...pageArgs(page),
+  });
 }
