@@ -8,6 +8,7 @@ GET /v1/pre-weighings/:id -> PRODUCTION_READ
 GET /v1/pre-weighings/plan -> PRODUCTION_READ
 GET /v1/productions -> PRODUCTION_READ
 GET /v1/productions/:id -> PRODUCTION_READ
+GET /v1/products -> CATALOG_READ
 GET /v1/products/:sku/recipe -> CATALOG_READ
 GET /v1/roles -> ACCESS_READ
 GET /v1/sessions/me -> authenticated
@@ -19,6 +20,7 @@ HEAD /v1/pre-weighings/:id -> PRODUCTION_READ
 HEAD /v1/pre-weighings/plan -> PRODUCTION_READ
 HEAD /v1/productions -> PRODUCTION_READ
 HEAD /v1/productions/:id -> PRODUCTION_READ
+HEAD /v1/products -> CATALOG_READ
 HEAD /v1/products/:sku/recipe -> CATALOG_READ
 HEAD /v1/roles -> ACCESS_READ
 HEAD /v1/sessions/me -> authenticated
