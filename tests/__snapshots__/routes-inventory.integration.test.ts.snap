@@ -12,6 +12,7 @@ GET /v1/products -> CATALOG_READ
 GET /v1/products/:sku/recipe -> CATALOG_READ
 GET /v1/roles -> ACCESS_READ
 GET /v1/sessions/me -> authenticated
+GET /v1/stock -> REPORTS_READ
 GET /v1/stock-movements -> ENTRIES_READ
 GET /v1/users -> ACCESS_READ
 GET /v1/users/:id -> ACCESS_READ
@@ -25,6 +26,7 @@ HEAD /v1/products -> CATALOG_READ
 HEAD /v1/products/:sku/recipe -> CATALOG_READ
 HEAD /v1/roles -> ACCESS_READ
 HEAD /v1/sessions/me -> authenticated
+HEAD /v1/stock -> REPORTS_READ
 HEAD /v1/stock-movements -> ENTRIES_READ
 HEAD /v1/users -> ACCESS_READ
 HEAD /v1/users/:id -> ACCESS_READ

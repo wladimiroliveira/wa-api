@@ -58,3 +58,16 @@ export function listStockMovements(query: { productSku?: string; limit: number; 
     ...pageArgs(page),
   });
 }
+
+// Every product, moved or not: one that never had an entry has no stock row yet.
+export function listProductsWithStock() {
+  return prisma.product.findMany({
+    select: {
+      sku: true,
+      description: true,
+      unit: true,
+      stock: { select: { quantity: true, lastEntryCost: true, averageCost: true, minimumQuantity: true } },
+    },
+    orderBy: { description: "asc" },
+  });
+}

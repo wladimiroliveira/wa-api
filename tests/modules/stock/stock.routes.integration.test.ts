@@ -129,3 +129,103 @@ describe("GET /v1/stock-movements", () => {
     expect((await listMovements(undefined)).statusCode).toBe(401);
   });
 });
+
+const getStock = (headers: { authorization: string } | undefined) =>
+  app.inject({ method: "GET", url: "/v1/stock", headers });
+
+const createStock = (productSku: string, data: Record<string, string>) =>
+  testPrisma.productStock.create({ data: { productSku, ...data } });
+
+describe("GET /v1/stock", () => {
+  it("lists the position of every product by description, and what the stock is worth", async () => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+    const yeast = await createProduct("Yeast");
+    const flour = await createProduct("Flour");
+    await createStock(flour.sku, { quantity: "10.5", lastEntryCost: "4.5", averageCost: "4.25", minimumQuantity: "5" });
+    await createStock(yeast.sku, { quantity: "2", lastEntryCost: "30", averageCost: "30.005" });
+
+    const response = await getStock(headers);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [
+        {
+          product: { sku: flour.sku, description: "Flour", unit: "KILOGRAM" },
+          quantity: "10.5",
+          minimumQuantity: "5",
+          lastEntryCost: "4.5",
+          averageCost: "4.25",
+          value: "44.63",
+          status: "OK",
+        },
+        {
+          product: { sku: yeast.sku, description: "Yeast", unit: "KILOGRAM" },
+          quantity: "2",
+          minimumQuantity: null,
+          lastEntryCost: "30",
+          averageCost: "30.005",
+          value: "60.01",
+          status: "OK",
+        },
+      ],
+      totalValue: "104.64",
+    });
+  });
+
+  it("lists a product that never moved as empty and worth nothing", async () => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+    const flour = await createProduct("Flour");
+
+    expect((await getStock(headers)).json()).toEqual({
+      items: [
+        {
+          product: { sku: flour.sku, description: "Flour", unit: "KILOGRAM" },
+          quantity: "0",
+          minimumQuantity: null,
+          lastEntryCost: null,
+          averageCost: null,
+          value: "0.00",
+          status: "EMPTY",
+        },
+      ],
+      totalValue: "0.00",
+    });
+  });
+
+  it.each([
+    ["a negative balance", { quantity: "-3", averageCost: "4" }, "NEGATIVE", "0.00"],
+    ["a zero balance", { quantity: "0", averageCost: "4", minimumQuantity: "5" }, "EMPTY", "0.00"],
+    [
+      "a balance under the minimum",
+      { quantity: "4.999", averageCost: "4", minimumQuantity: "5" },
+      "BELOW_MINIMUM",
+      "20.00",
+    ],
+    ["a balance exactly at the minimum", { quantity: "5", averageCost: "4", minimumQuantity: "5" }, "OK", "20.00"],
+  ])("reads %s as such", async (_label, stock, status, value) => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+    const flour = await createProduct("Flour");
+    await createStock(flour.sku, stock);
+
+    const response = await getStock(headers);
+
+    expect(response.json().items[0]).toMatchObject({ status, value });
+    expect(response.json().totalValue).toBe(value);
+  });
+
+  it("answers an empty position when the catalog is empty", async () => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+
+    expect((await getStock(headers)).json()).toEqual({ items: [], totalValue: "0.00" });
+  });
+
+  it("answers 403 without REPORTS_READ", async () => {
+    const { headers } = await authenticateAs(app, [Permission.ENTRIES_READ]);
+
+    expect((await getStock(headers)).statusCode).toBe(403);
+  });
+
+  it("answers 401 without a token", async () => {
+    expect((await getStock(undefined)).statusCode).toBe(401);
+  });
+});
