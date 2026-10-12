@@ -78,6 +78,12 @@ export function listStockMovements(query: { productSku?: string; limit: number; 
   });
 }
 
+const STOCK_FIELDS = {
+  select: { quantity: true, lastEntryCost: true, averageCost: true, minimumQuantity: true },
+} as const;
+
+const STILL_HELD = { quantity: { gt: 0 } } as const;
+
 // Every product, moved or not: one that never had an entry has no stock row yet.
 export function listProductsWithStock() {
   return prisma.product.findMany({
@@ -85,8 +91,36 @@ export function listProductsWithStock() {
       sku: true,
       description: true,
       unit: true,
-      stock: { select: { quantity: true, lastEntryCost: true, averageCost: true, minimumQuantity: true } },
+      stock: STOCK_FIELDS,
+      lots: { where: STILL_HELD, select: { quantity: true, unitCost: true, expiresAt: true } },
     },
     orderBy: { description: "asc" },
+  });
+}
+
+// The lots come in the order they are to be used: the first to expire first, the ones that never
+// expire last, and the one that came in earlier ahead of another expiring on the same day.
+export function findProductWithStock(sku: string, { depleted }: { depleted: boolean }) {
+  return prisma.product.findUnique({
+    where: { sku },
+    select: {
+      sku: true,
+      description: true,
+      unit: true,
+      stock: STOCK_FIELDS,
+      lots: {
+        where: depleted ? {} : STILL_HELD,
+        select: {
+          id: true,
+          expiresAt: true,
+          initialQuantity: true,
+          quantity: true,
+          unitCost: true,
+          createdAt: true,
+          supplier: { select: { id: true, name: true } },
+        },
+        orderBy: [{ expiresAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }, { id: "asc" }],
+      },
+    },
   });
 }

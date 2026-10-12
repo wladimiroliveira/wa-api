@@ -133,8 +133,41 @@ describe("GET /v1/stock-movements", () => {
 const getStock = (headers: { authorization: string } | undefined) =>
   app.inject({ method: "GET", url: "/v1/stock", headers });
 
-const createStock = (productSku: string, data: Record<string, string>) =>
-  testPrisma.productStock.create({ data: { productSku, ...data } });
+// A balance above zero is held in lots, so the stock is given one lot holding all of it.
+const createStock = async (productSku: string, data: Record<string, string>, expiresAt: string | null = null) => {
+  await testPrisma.productStock.create({ data: { productSku, ...data } });
+
+  if (Number(data.quantity) > 0)
+    await createLot(productSku, { quantity: data.quantity, unitCost: data.averageCost, expiresAt });
+};
+
+const createLot = (
+  productSku: string,
+  lot: {
+    quantity: string;
+    unitCost?: string;
+    expiresAt?: string | null;
+    initialQuantity?: string;
+    supplierId?: string;
+  },
+) =>
+  testPrisma.stockLot.create({
+    data: {
+      productSku,
+      supplierId: lot.supplierId,
+      initialQuantity: lot.initialQuantity ?? lot.quantity,
+      quantity: lot.quantity,
+      unitCost: lot.unitCost ?? "0",
+      expiresAt: lot.expiresAt == null ? null : new Date(lot.expiresAt),
+    },
+  });
+
+const daysFromToday = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
 
 describe("GET /v1/stock", () => {
   it("lists the position of every product by description, and what the stock is worth", async () => {
@@ -156,6 +189,8 @@ describe("GET /v1/stock", () => {
           lastEntryCost: "4.5",
           averageCost: "4.25",
           value: "44.63",
+          lotCount: 1,
+          nextExpiresAt: null,
           status: "OK",
         },
         {
@@ -165,6 +200,8 @@ describe("GET /v1/stock", () => {
           lastEntryCost: "30",
           averageCost: "30.005",
           value: "60.01",
+          lotCount: 1,
+          nextExpiresAt: null,
           status: "OK",
         },
       ],
@@ -185,6 +222,8 @@ describe("GET /v1/stock", () => {
           lastEntryCost: null,
           averageCost: null,
           value: "0.00",
+          lotCount: 0,
+          nextExpiresAt: null,
           status: "EMPTY",
         },
       ],
@@ -227,5 +266,150 @@ describe("GET /v1/stock", () => {
 
   it("answers 401 without a token", async () => {
     expect((await getStock(undefined)).statusCode).toBe(401);
+  });
+
+  it("values the stock at what each lot cost, and tells the lots still held and the next to expire", async () => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+    const flour = await createProduct("Flour");
+    await testPrisma.productStock.create({ data: { productSku: flour.sku, quantity: "5", averageCost: "5" } });
+    await createLot(flour.sku, { quantity: "2", unitCost: "4", expiresAt: daysFromToday(90) });
+    await createLot(flour.sku, { quantity: "3", unitCost: "6", expiresAt: daysFromToday(60) });
+    await createLot(flour.sku, { quantity: "0", unitCost: "9", expiresAt: daysFromToday(40), initialQuantity: "7" });
+    await createLot(flour.sku, { quantity: "0", unitCost: "9", initialQuantity: "1" });
+
+    const [item] = (await getStock(headers)).json().items;
+
+    expect(item).toMatchObject({ value: "26.00", lotCount: 2, nextExpiresAt: daysFromToday(60), status: "OK" });
+  });
+
+  it.each([
+    ["a product holding an expired lot", -1, "EXPIRED"],
+    ["a product holding a lot about to expire", 30, "EXPIRING_SOON"],
+    ["a product whose lots expire later", 31, "OK"],
+  ])("reads %s as such", async (_label, days, status) => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+    const flour = await createProduct("Flour");
+    await createStock(flour.sku, { quantity: "5", averageCost: "4" }, daysFromToday(days));
+
+    expect((await getStock(headers)).json().items[0].status).toBe(status);
+  });
+});
+
+const getProductStock = (
+  headers: { authorization: string } | undefined,
+  sku: string,
+  query: Record<string, string> = {},
+) => app.inject({ method: "GET", url: `/v1/stock/${sku}`, headers, query });
+
+describe("GET /v1/stock/:sku", () => {
+  it("details the position of a product and the lots it still holds, the first to expire first", async () => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+    const flour = await createProduct("Flour");
+    const mill = await testPrisma.supplier.create({ data: { name: "Santa Clara Mill" } });
+    await testPrisma.productStock.create({
+      data: { productSku: flour.sku, quantity: "6", averageCost: "5", lastEntryCost: "6", minimumQuantity: "2" },
+    });
+    const never = await createLot(flour.sku, { quantity: "1", unitCost: "2" });
+    const later = await createLot(flour.sku, { quantity: "2", unitCost: "4", expiresAt: daysFromToday(90) });
+    const sooner = await createLot(flour.sku, {
+      quantity: "3",
+      unitCost: "6",
+      expiresAt: daysFromToday(10),
+      initialQuantity: "8",
+      supplierId: mill.id,
+    });
+    await createLot(flour.sku, { quantity: "0", unitCost: "9", expiresAt: daysFromToday(5), initialQuantity: "7" });
+
+    const response = await getProductStock(headers, flour.sku);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      product: { sku: flour.sku, description: "Flour", unit: "KILOGRAM" },
+      quantity: "6",
+      minimumQuantity: "2",
+      lastEntryCost: "6",
+      averageCost: "5",
+      value: "28.00",
+      lotCount: 3,
+      nextExpiresAt: daysFromToday(10),
+      status: "EXPIRING_SOON",
+      lots: [
+        {
+          id: sooner.id,
+          expiresAt: daysFromToday(10),
+          supplier: { id: mill.id, name: "Santa Clara Mill" },
+          initialQuantity: "8",
+          quantity: "3",
+          unitCost: "6",
+          value: "18.00",
+          createdAt: sooner.createdAt.toISOString(),
+          status: "EXPIRING_SOON",
+        },
+        expect.objectContaining({ id: later.id, expiresAt: daysFromToday(90), supplier: null, status: "OK" }),
+        expect.objectContaining({ id: never.id, expiresAt: null, value: "2.00", status: "OK" }),
+      ],
+    });
+  });
+
+  it("puts the lot that came in first ahead of another that expires on the same day", async () => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+    const flour = await createProduct("Flour");
+    const first = await createLot(flour.sku, { quantity: "1", expiresAt: daysFromToday(90) });
+    const second = await createLot(flour.sku, { quantity: "1", expiresAt: daysFromToday(90) });
+
+    const { lots } = (await getProductStock(headers, flour.sku)).json();
+
+    expect(lots.map(({ id }: { id: string }) => id)).toEqual([first.id, second.id]);
+  });
+
+  it("includes the lots with nothing left when asked for them", async () => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+    const flour = await createProduct("Flour");
+    const depleted = await createLot(flour.sku, { quantity: "0", expiresAt: daysFromToday(-5), initialQuantity: "7" });
+
+    const response = await getProductStock(headers, flour.sku, { depleted: "true" });
+
+    expect(response.json().lots).toEqual([expect.objectContaining({ id: depleted.id, status: "DEPLETED" })]);
+    expect(response.json().status).toBe("EMPTY");
+  });
+
+  it("details a product that never moved as empty, with no lots", async () => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+    const flour = await createProduct("Flour");
+
+    expect((await getProductStock(headers, flour.sku)).json()).toMatchObject({
+      quantity: "0",
+      status: "EMPTY",
+      lots: [],
+    });
+  });
+
+  it("answers 404 for a product that does not exist", async () => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+
+    expect((await getProductStock(headers, "0199a1f0-0000-7000-8000-0000000000ff")).statusCode).toBe(404);
+  });
+
+  it.each([
+    ["a product that is not a sku", "flour", {}],
+    [
+      "an unknown answer to whether depleted lots are wanted",
+      "0199a1f0-0000-7000-8000-0000000000ff",
+      { depleted: "maybe" },
+    ],
+  ])("answers 400 for %s", async (_label, sku, query) => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+
+    expect((await getProductStock(headers, sku, query)).statusCode).toBe(400);
+  });
+
+  it("answers 403 without REPORTS_READ", async () => {
+    const { headers } = await authenticateAs(app, [Permission.ENTRIES_READ]);
+
+    expect((await getProductStock(headers, "0199a1f0-0000-7000-8000-0000000000ff")).statusCode).toBe(403);
+  });
+
+  it("answers 401 without a token", async () => {
+    expect((await getProductStock(undefined, "0199a1f0-0000-7000-8000-0000000000ff")).statusCode).toBe(401);
   });
 });

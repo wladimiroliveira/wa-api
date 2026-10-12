@@ -10,3 +10,11 @@ export function localToday(now = new Date()): string {
 export function toDateString(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
+
+// The calendar day that many days after another one.
+export function addDays(day: string, days: number): string {
+  const date = new Date(`${day}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+
+  return toDateString(date);
+}
