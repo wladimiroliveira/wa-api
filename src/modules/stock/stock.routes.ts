@@ -62,8 +62,9 @@ export default async function stockRoutes(app: FastifyInstance) {
       const { items, nextCursor } = toPage(await listStockMovements(request.query), request.query);
 
       return reply.send({
-        items: items.map((movement) => ({
+        items: items.map(({ lot, ...movement }) => ({
           ...movement,
+          lot: lot === null ? null : { ...lot, expiresAt: lot.expiresAt === null ? null : toDateString(lot.expiresAt) },
           quantity: movement.quantity.toString(),
           unitCost: movement.unitCost.toString(),
           createdAt: movement.createdAt.toISOString(),

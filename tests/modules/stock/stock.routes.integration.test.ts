@@ -62,12 +62,61 @@ describe("GET /v1/stock-movements", () => {
           unitCost: "4",
           createdAt: consumption.createdAt.toISOString(),
           product: { sku: product.sku, description: "Wheat flour", unit: "KILOGRAM" },
+          lot: null,
           createdBy: { id: userId, name: "Test Person" },
         },
         expect.objectContaining({ id: entry.id, type: "ENTRY" }),
       ],
       nextCursor: null,
     });
+  });
+
+  it("tells the lot a movement moved, with its expiry date and supplier", async () => {
+    const { headers, userId } = await authenticateAs(app, [Permission.ENTRIES_READ]);
+    const product = await createProduct();
+    const supplier = await testPrisma.supplier.create({ data: { name: "Santa Clara Mill" } });
+    const dated = await testPrisma.stockLot.create({
+      data: {
+        productSku: product.sku,
+        supplierId: supplier.id,
+        quantity: "10",
+        initialQuantity: "10",
+        unitCost: "4",
+        expiresAt: new Date("2099-12-31"),
+      },
+    });
+    const undated = await testPrisma.stockLot.create({
+      data: { productSku: product.sku, quantity: "10", initialQuantity: "10", unitCost: "4" },
+    });
+    await testPrisma.stockMovement.create({
+      data: {
+        productSku: product.sku,
+        createdById: userId,
+        type: "ENTRY",
+        quantity: "10",
+        unitCost: "4",
+        lotId: dated.id,
+        createdAt: new Date("2026-10-01T12:00:00Z"),
+      },
+    });
+    await testPrisma.stockMovement.create({
+      data: {
+        productSku: product.sku,
+        createdById: userId,
+        type: "ENTRY",
+        quantity: "10",
+        unitCost: "4",
+        lotId: undated.id,
+        createdAt: new Date("2026-10-01T11:00:00Z"),
+      },
+    });
+
+    const lots = (await listMovements(headers)).json().items.map(({ lot }: { lot: unknown }) => lot);
+
+    expect(lots).toEqual([
+      { id: dated.id, expiresAt: "2099-12-31", supplier: { id: supplier.id, name: "Santa Clara Mill" } },
+      { id: undated.id, expiresAt: null, supplier: null },
+    ]);
   });
 
   it("answers an empty page when nothing has moved", async () => {
