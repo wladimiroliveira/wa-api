@@ -1375,6 +1375,72 @@
         }
       }
     },
+    "/v1/products": {
+      "get": {
+        "summary": "Lista os produtos",
+        "tags": [
+          "products"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "sku": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "UNIT",
+                          "KILOGRAM",
+                          "GRAM",
+                          "LITER",
+                          "MILLILITER"
+                        ]
+                      },
+                      "gtin": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "GOODS",
+                          "MANUFACTURED"
+                        ]
+                      },
+                      "isActive": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "sku",
+                      "description",
+                      "unit",
+                      "gtin",
+                      "kind",
+                      "isActive"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/entries": {
       "post": {
         "summary": "Lança a entrada de um produto e soma ao estoque",
