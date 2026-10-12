@@ -10,6 +10,7 @@ import productionsRoutes from "./modules/productions/productions.routes.js";
 import productsRoutes from "./modules/products/products.routes.js";
 import recipesRoutes from "./modules/recipes/recipes.routes.js";
 import rolesRoutes from "./modules/roles/roles.routes.js";
+import stockRoutes from "./modules/stock/stock.routes.js";
 import usersRoutes from "./modules/users/users.routes.js";
 
 export default async function (app: FastifyInstance) {
@@ -31,6 +32,7 @@ export default async function (app: FastifyInstance) {
   await app.register(usersRoutes);
   await app.register(productsRoutes);
   await app.register(entriesRoutes);
+  await app.register(stockRoutes);
   await app.register(recipesRoutes);
   await app.register(preWeighingsRoutes);
   await app.register(productionsRoutes);
