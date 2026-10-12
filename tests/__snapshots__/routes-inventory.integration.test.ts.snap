@@ -14,6 +14,7 @@ GET /v1/roles -> ACCESS_READ
 GET /v1/sessions/me -> authenticated
 GET /v1/stock -> REPORTS_READ
 GET /v1/stock-movements -> ENTRIES_READ
+GET /v1/suppliers -> CATALOG_READ
 GET /v1/users -> ACCESS_READ
 GET /v1/users/:id -> ACCESS_READ
 HEAD /v1/health -> public
@@ -28,6 +29,7 @@ HEAD /v1/roles -> ACCESS_READ
 HEAD /v1/sessions/me -> authenticated
 HEAD /v1/stock -> REPORTS_READ
 HEAD /v1/stock-movements -> ENTRIES_READ
+HEAD /v1/suppliers -> CATALOG_READ
 HEAD /v1/users -> ACCESS_READ
 HEAD /v1/users/:id -> ACCESS_READ
 PATCH /v1/roles/:id -> ACCESS_UPDATE
@@ -44,6 +46,7 @@ POST /v1/roles -> ACCESS_CREATE
 POST /v1/sessions/refresh -> public
 POST /v1/sessions/signin -> public
 POST /v1/sessions/signout -> authenticated
+POST /v1/suppliers -> CATALOG_CREATE
 POST /v1/users -> ACCESS_CREATE
 PUT /v1/products/:sku/recipe -> CATALOG_UPDATE"
 `;
