@@ -108,6 +108,15 @@ model Product {
   @@map("products")
 }
 
+model Supplier {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("suppliers")
+}
+
 model ProductStock {
   productSku      String   @id @map("product_sku") @db.Uuid
   product         Product  @relation(fields: [productSku], references: [sku], onDelete: Restrict)
