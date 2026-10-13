@@ -171,6 +171,14 @@ export async function takeFromLot(
   client: Prisma.TransactionClient,
   { lotId, quantity }: { lotId: string; quantity: Prisma.Decimal },
 ): Promise<LotTake> {
+  const owner = await client.stockLot.findUnique({ where: { id: lotId }, select: { productSku: true } });
+
+  if (owner === null) return { failure: "missing" };
+
+  // Whatever takes from the lots of a product holds its balance first and its lots after. Holding
+  // them the other way round here would deadlock with a consumption of the same product.
+  await lockStockBalance(client, owner.productSku);
+
   const [lot] = await client.$queryRaw<NamedLot[]>`
     SELECT id, product_sku AS "productSku", quantity, unit_cost AS "unitCost", expires_at AS "expiresAt"
     FROM stock_lots
