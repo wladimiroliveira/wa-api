@@ -32,23 +32,37 @@ export function increaseStock(
   `;
 }
 
-// Reads the balance of a product and holds it until the transaction ends, so whatever is decided
-// from it is still true when it is written.
-export async function lockStockBalance(client: Prisma.TransactionClient, productSku: string) {
+type HeldBalance = { quantity: Prisma.Decimal; lastEntryCost: Prisma.Decimal | null };
+
+// Holds the balances of several products until the transaction ends, always in the same order.
+// Whatever moves more than one product holds them all here before moving any: taking them one by
+// one, in an order of its own, would deadlock with another doing the same the other way round.
+export async function holdStockBalances(client: Prisma.TransactionClient, productSkus: string[]) {
+  const skus = [...new Set(productSkus.map((sku) => sku.toLowerCase()))].sort();
+
+  if (skus.length === 0) return [];
+
   // A product that never moved has no row to hold, and two first movements at once would each read
   // the other's lot against a balance that is not there yet. Opening the row first gives them one.
   await client.$executeRaw`
     INSERT INTO product_stocks (product_sku, quantity, updated_at)
-    VALUES (${productSku}::uuid, 0, now())
+    VALUES ${Prisma.join(skus.map((sku) => Prisma.sql`(${sku}::uuid, 0, now())`))}
     ON CONFLICT (product_sku) DO NOTHING
   `;
 
-  const [balance] = await client.$queryRaw<{ quantity: Prisma.Decimal; lastEntryCost: Prisma.Decimal | null }[]>`
+  return client.$queryRaw<HeldBalance[]>`
     SELECT quantity, last_entry_cost AS "lastEntryCost"
     FROM product_stocks
-    WHERE product_sku = ${productSku}::uuid
+    WHERE product_sku IN (${Prisma.join(skus.map((sku) => Prisma.sql`${sku}::uuid`))})
+    ORDER BY product_sku
     FOR UPDATE
   `;
+}
+
+// Reads the balance of a product and holds it until the transaction ends, so whatever is decided
+// from it is still true when it is written.
+export async function lockStockBalance(client: Prisma.TransactionClient, productSku: string) {
+  const [balance] = await holdStockBalances(client, [productSku]);
   const { _sum } = await client.stockLot.aggregate({ where: { productSku }, _sum: { quantity: true } });
   const held = _sum.quantity ?? ZERO;
   const quantity = balance?.quantity ?? ZERO;
