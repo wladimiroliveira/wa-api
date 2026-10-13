@@ -91,3 +91,42 @@ describe("taking more than the lots of a product cover", () => {
     ).toBe("-5");
   });
 });
+
+describe("taking a quantity that spans several lots", () => {
+  it("takes from each lot it reaches, stamps them as changed and leaves the others alone", async () => {
+    const product = await testPrisma.product.create({
+      data: { description: "Wheat flour", kind: "GOODS", unit: "KILOGRAM" },
+    });
+    await testPrisma.productStock.create({ data: { productSku: product.sku, quantity: "9", averageCost: "4" } });
+
+    const longAgo = new Date("2020-01-01T00:00:00.000Z");
+    const lotExpiring = (expiresAt: string) =>
+      testPrisma.stockLot.create({
+        data: {
+          productSku: product.sku,
+          quantity: "3",
+          initialQuantity: "3",
+          unitCost: "4",
+          expiresAt: new Date(expiresAt),
+          updatedAt: longAgo,
+        },
+      });
+    const first = await lotExpiring("2099-01-01");
+    const second = await lotExpiring("2099-02-01");
+    const third = await lotExpiring("2099-03-01");
+
+    await testPrisma.$transaction((tx) =>
+      takeFromLots(tx, { productSku: product.sku, quantity: new Prisma.Decimal(4), today: "2026-01-01" }),
+    );
+
+    const after = async (id: string) => {
+      const lot = await testPrisma.stockLot.findUniqueOrThrow({ where: { id } });
+
+      return { quantity: lot.quantity.toString(), changed: lot.updatedAt > longAgo };
+    };
+
+    expect(await after(first.id)).toEqual({ quantity: "0", changed: true });
+    expect(await after(second.id)).toEqual({ quantity: "2", changed: true });
+    expect(await after(third.id)).toEqual({ quantity: "3", changed: false });
+  });
+});

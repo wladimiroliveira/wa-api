@@ -136,8 +136,15 @@ export async function takeFromLots(
   const lots = await usableLots(client, { productSku, today, lock: true });
   const { takes, shortfall } = allocate(lots, quantity);
 
-  for (const { lot, quantity: taken } of takes) {
-    await client.stockLot.update({ where: { id: lot.id }, data: { quantity: { decrement: taken } } });
+  if (takes.length > 0) {
+    // One statement for every lot reached, however many they are.
+    await client.$executeRaw`
+      UPDATE stock_lots AS lot
+      SET quantity = lot.quantity - take.quantity, updated_at = now()
+      FROM (VALUES ${Prisma.join(takes.map(({ lot, quantity: taken }) => Prisma.sql`(${lot.id}::uuid, ${taken}::numeric)`))})
+        AS take (id, quantity)
+      WHERE lot.id = take.id
+    `;
   }
 
   await decreaseStock(client, { productSku, quantity: quantity.toString() });
