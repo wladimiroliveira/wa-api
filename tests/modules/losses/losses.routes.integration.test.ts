@@ -95,6 +95,16 @@ describe("POST /v1/losses", () => {
     expect(loss.movementId).toBe(movement.id);
   });
 
+  it("answers the quantity as it was recorded, not as it was typed", async () => {
+    const { headers } = await canRegister();
+    const { lot, reason } = await flourInStock();
+
+    const response = await postLoss(headers, { lotId: lot.id, reasonId: reason.id, quantity: "2.50" });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().quantity).toBe("2.5");
+  });
+
   it("writes off a lot that has already expired, all of it", async () => {
     const { headers } = await canRegister();
     const { lot, reason } = await flourInStock({ expiresAt: "2020-01-01" });

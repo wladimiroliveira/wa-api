@@ -130,7 +130,7 @@ export default async function lossesRoutes(app: FastifyInstance) {
 
       return reply.code(201).send({
         id: loss.id,
-        quantity: request.body.quantity,
+        quantity: loss.movement.quantity.toString(),
         unitCost: lot.unitCost.toString(),
         note: loss.note,
         createdAt: loss.createdAt.toISOString(),

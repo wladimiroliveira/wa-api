@@ -62,6 +62,7 @@ export function insertLoss(input: {
         note: true,
         createdAt: true,
         reason: { select: { id: true, name: true } },
+        movement: { select: { quantity: true } },
         lot: { select: { product: { select: { sku: true, description: true, unit: true } } } },
       },
     });
