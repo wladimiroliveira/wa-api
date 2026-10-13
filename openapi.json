@@ -2230,8 +2230,8 @@
                             "type": "string",
                             "enum": [
                               "NEGATIVE",
-                              "EMPTY",
                               "EXPIRED",
+                              "EMPTY",
                               "EXPIRING_SOON",
                               "BELOW_MINIMUM",
                               "OK"
@@ -2369,8 +2369,8 @@
                       "type": "string",
                       "enum": [
                         "NEGATIVE",
-                        "EMPTY",
                         "EXPIRED",
+                        "EMPTY",
                         "EXPIRING_SOON",
                         "BELOW_MINIMUM",
                         "OK"

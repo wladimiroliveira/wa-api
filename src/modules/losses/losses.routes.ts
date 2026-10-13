@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { Permission } from "../../generated/prisma/index.js";
-import { toDateString } from "../../lib/dates.js";
+import { toOptionalDateString } from "../../lib/dates.js";
 import { AUTHENTICATED } from "../auth/auth.access.js";
 import { messageSchema } from "../auth/auth.schemas.js";
 import {
@@ -22,9 +22,11 @@ import {
   updateLossReasonBodySchema,
 } from "./losses.schemas.js";
 
-const LOT_FAILURES = {
+const LOSS_FAILURES = {
   missing: { code: 404, message: "Lot not found." },
   insufficient: { code: 409, message: "The lot does not hold that much." },
+  "reason-missing": { code: 404, message: "Loss reason not found." },
+  "reason-inactive": { code: 409, message: "Loss reason is inactive." },
 } as const;
 
 export default async function lossesRoutes(app: FastifyInstance) {
@@ -108,20 +110,10 @@ export default async function lossesRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const reason = await findLossReasonById(request.body.reasonId);
-
-      if (reason === null) {
-        return reply.code(404).send({ message: "Loss reason not found." });
-      }
-
-      if (!reason.isActive) {
-        return reply.code(409).send({ message: "Loss reason is inactive." });
-      }
-
       const recorded = await insertLoss({ ...request.body, createdById: request.currentUser!.id });
 
       if ("failure" in recorded) {
-        const { code, message } = LOT_FAILURES[recorded.failure];
+        const { code, message } = LOSS_FAILURES[recorded.failure];
 
         return reply.code(code).send({ message });
       }
@@ -130,7 +122,7 @@ export default async function lossesRoutes(app: FastifyInstance) {
 
       return reply.code(201).send({
         id: loss.id,
-        quantity: request.body.quantity,
+        quantity: loss.movement.quantity.toString(),
         unitCost: lot.unitCost.toString(),
         note: loss.note,
         createdAt: loss.createdAt.toISOString(),
@@ -138,7 +130,7 @@ export default async function lossesRoutes(app: FastifyInstance) {
         product: loss.lot.product,
         lot: {
           id: lot.id,
-          expiresAt: lot.expiresAt === null ? null : toDateString(lot.expiresAt),
+          expiresAt: toOptionalDateString(lot.expiresAt),
           quantity: lot.left.toString(),
         },
       });

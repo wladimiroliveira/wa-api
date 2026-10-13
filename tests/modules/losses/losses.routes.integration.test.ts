@@ -95,6 +95,16 @@ describe("POST /v1/losses", () => {
     expect(loss.movementId).toBe(movement.id);
   });
 
+  it("answers the quantity as it was recorded, not as it was typed", async () => {
+    const { headers } = await canRegister();
+    const { lot, reason } = await flourInStock();
+
+    const response = await postLoss(headers, { lotId: lot.id, reasonId: reason.id, quantity: "2.50" });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().quantity).toBe("2.5");
+  });
+
   it("writes off a lot that has already expired, all of it", async () => {
     const { headers } = await canRegister();
     const { lot, reason } = await flourInStock({ expiresAt: "2020-01-01" });
@@ -143,14 +153,64 @@ describe("POST /v1/losses", () => {
     expect(await lotQuantity(lot.id)).toBe("2");
   });
 
-  it("answers 409 for a reason that is no longer in use", async () => {
+  it("answers 409 for a reason that is no longer in use, and writes nothing", async () => {
     const { headers } = await canRegister();
-    const { lot, reason } = await flourInStock({ reasonIsActive: false });
+    const { product, lot, reason } = await flourInStock({ reasonIsActive: false });
 
     const response = await postLoss(headers, { lotId: lot.id, reasonId: reason.id, quantity: "1" });
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toEqual({ message: "Loss reason is inactive." });
+    expect(await lotQuantity(lot.id)).toBe("10");
+    expect(await balanceOf(product.sku)).toBe("10");
+    expect(await testPrisma.stockMovement.count()).toBe(0);
+  });
+
+  it("answers 409 when the reason is put out of use while the loss waits for the stock", async () => {
+    const { headers } = await canRegister();
+    const { product, lot, reason } = await flourInStock();
+
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = () => {};
+    const holding = new Promise<void>((resolve) => {
+      held = resolve;
+    });
+
+    // Something else holds the balance of the product, as a consumption under way would.
+    const other = testPrisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM product_stocks WHERE product_sku = ${product.sku}::uuid FOR UPDATE`;
+      held();
+      await released;
+    });
+    await holding;
+
+    const pending = postLoss(headers, { lotId: lot.id, reasonId: reason.id, quantity: "1" });
+
+    for (let attempt = 0; ; attempt++) {
+      const [{ waiting }] = await testPrisma.$queryRaw<{ waiting: number }[]>`
+        SELECT count(*)::int AS waiting FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock'
+      `;
+
+      if (waiting > 0) break;
+      if (attempt === 100) throw new Error("The loss never got to wait for the stock.");
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+
+    await testPrisma.lossReason.update({ where: { id: reason.id }, data: { isActive: false } });
+    release();
+    await other;
+
+    const response = await pending;
+
+    expect({ status: response.statusCode, lossesRecorded: await testPrisma.stockLoss.count() }).toEqual({
+      status: 409,
+      lossesRecorded: 0,
+    });
   });
 
   it("answers 404 for a lot or a reason that does not exist", async () => {

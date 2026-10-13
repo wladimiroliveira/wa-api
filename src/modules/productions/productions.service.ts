@@ -3,6 +3,7 @@ import { localToday } from "../../lib/dates.js";
 import { toStoredDecimal } from "../../lib/decimal.js";
 import { findPreWeighingById } from "../pre-weighings/pre-weighings.repository.js";
 import { planPreWeighing } from "../pre-weighings/pre-weighings.service.js";
+import { holdStockBalances } from "../stock/stock.repository.js";
 import {
   consumeProductionInput,
   findProductionById,
@@ -124,6 +125,11 @@ export async function finishProduction(input: {
 
     await inProductionTransaction(async (tx) => {
       if (!(await markProductionFinished(tx, id))) throw new ProductionAborted(notInProgress);
+
+      await holdStockBalances(
+        tx,
+        production.items.flatMap((item) => [item.product.sku, ...item.inputs.map((input) => input.product.sku)]),
+      );
 
       for (const item of production.items) {
         const { producedQuantity, expiresAt } = producedById.get(item.id)!;

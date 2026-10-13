@@ -121,7 +121,14 @@ async function stockInLots(productSku: string, lots: [quantity: string, unitCost
     data: { productSku, quantity: String(total), averageCost: "1", lastEntryCost: "1" },
   });
 
-  return Promise.all(lots.map(([quantity, unitCost, expiresAt]) => lot(productSku, quantity, unitCost, expiresAt)));
+  // One at a time: created together, which of them came in first would be left to chance.
+  const created = [];
+
+  for (const [quantity, unitCost, expiresAt] of lots) {
+    created.push(await lot(productSku, quantity, unitCost, expiresAt));
+  }
+
+  return created;
 }
 
 const lotQuantity = async (id: string) =>
@@ -961,3 +968,92 @@ describe("GET /v1/productions", () => {
 });
 
 type Ids = { dough: string; preWeighing: string };
+
+describe("finishing two productions that share inputs at the same time", () => {
+  // A product made of one unit of each of its ingredients.
+  async function createMade(description: string, ingredientSkus: string[]) {
+    const product = await createProduct(description, { kind: "MANUFACTURED" });
+
+    await testPrisma.recipe.create({
+      data: {
+        productSku: product.sku,
+        yieldQuantity: "1",
+        ingredients: { create: ingredientSkus.map((productSku) => ({ productSku, quantity: "1" })) },
+      },
+    });
+
+    return product;
+  }
+
+  async function startOf(headers: Headers, productSkus: string[]) {
+    const production = (
+      await postProduction(headers, { items: productSkus.map((productSku) => ({ productSku, quantity: "1" })) })
+    ).json();
+
+    return {
+      id: production.id as string,
+      items: production.items.map((item: { id: string }) => ({ id: item.id, producedQuantity: "1" })),
+    };
+  }
+
+  async function waitingForALock(sessions: number) {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const [{ waiting }] = await testPrisma.$queryRaw<{ waiting: number }[]>`
+        SELECT count(*)::int AS waiting FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock'
+      `;
+
+      if (waiting >= sessions) return;
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+
+    throw new Error("The productions never got to wait for the stock.");
+  }
+
+  it("finishes both, whatever the order each of them reaches the inputs in", async () => {
+    const { headers } = await canDoBoth();
+    const sugar = await createProduct("Sugar");
+    const flour = await createProduct("Flour");
+    const egg = await createProduct("Egg");
+    const milk = await createProduct("Milk");
+
+    // The first reaches sugar, then egg, then flour; the second flour, then milk, then sugar.
+    const syrup = await createMade("Alpha syrup", [sugar.sku]);
+    const dough = await createMade("Beta dough", [egg.sku, flour.sku]);
+    const mix = await createMade("Gamma mix", [flour.sku, milk.sku, sugar.sku]);
+    const first = await startOf(headers, [syrup.sku, dough.sku]);
+    const second = await startOf(headers, [mix.sku]);
+
+    // Egg and milk are held by something else just long enough for each production to stop
+    // halfway, holding the input the other is about to ask for.
+    await testPrisma.productStock.createMany({
+      data: [egg, milk].map(({ sku }) => ({ productSku: sku, quantity: "0" })),
+    });
+
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = () => {};
+    const holding = new Promise<void>((resolve) => {
+      held = resolve;
+    });
+    const gate = testPrisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT 1 FROM product_stocks WHERE product_sku IN (${egg.sku}::uuid, ${milk.sku}::uuid) FOR UPDATE
+      `;
+      held();
+      await released;
+    });
+    await holding;
+
+    const finishing = [first, second].map(({ id, items }) => postFinish(headers, id, { items }));
+
+    await waitingForALock(2);
+    release();
+    await gate;
+
+    expect((await Promise.all(finishing)).map((response) => response.statusCode)).toEqual([200, 200]);
+  });
+});
