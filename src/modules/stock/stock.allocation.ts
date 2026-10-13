@@ -32,3 +32,19 @@ export function inOrderOfUse<Lot extends Dated>(lots: Lot[]): Lot[] {
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 }
+
+const ZERO = new Prisma.Decimal(0);
+
+// What was taken beyond what the lots held and is still to be settled: the lots that are left hold
+// that much more than the balance shows.
+export function owedOf({ held, quantity }: { held: Prisma.Decimal; quantity: Prisma.Decimal }): Prisma.Decimal {
+  return Prisma.Decimal.max(ZERO, held.sub(quantity));
+}
+
+type Cost = Prisma.Decimal | null;
+
+// What the lots did not cover costs what the last lot taken from cost. With none to take from, it
+// costs what the newest lot the product had cost, and what its last entry cost before there were lots.
+export function costOfShortfall(known: { lastLotTaken: Cost; newestLot: Cost; lastEntry: Cost }): Prisma.Decimal {
+  return known.lastLotTaken ?? known.newestLot ?? known.lastEntry ?? ZERO;
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "../../../src/generated/prisma/index.js";
-import { allocate, inOrderOfUse } from "../../../src/modules/stock/stock.allocation.js";
+import { allocate, costOfShortfall, inOrderOfUse, owedOf } from "../../../src/modules/stock/stock.allocation.js";
 
 const decimal = (value: string) => new Prisma.Decimal(value);
 const lot = (id: string, quantity: string) => ({ id, quantity: decimal(quantity) });
@@ -74,5 +74,35 @@ describe("inOrderOfUse", () => {
     inOrderOfUse(lots);
 
     expect(ids(lots)).toEqual(["a", "b"]);
+  });
+});
+
+describe("owedOf", () => {
+  it.each([
+    ["nothing when the balance matches what the lots hold", "10", "10", "0"],
+    ["what the lots hold beyond the balance", "10", "7.5", "2.5"],
+    ["the whole negative balance when no lot holds anything", "0", "-4", "4"],
+    ["nothing when the balance is above what the lots hold", "3", "5", "0"],
+  ])("is %s", (_label, held, quantity, owed) => {
+    expect(owedOf({ held: decimal(held), quantity: decimal(quantity) }).toString()).toBe(owed);
+  });
+});
+
+describe("costOfShortfall", () => {
+  const cost = (value: string | null) => (value === null ? null : decimal(value));
+
+  it.each([
+    ["the last lot taken from", "3", "4", "5", "3"],
+    ["the newest lot the product had when none was taken from", null, "4", "5", "4"],
+    ["the last entry when the product never had a lot", null, null, "5", "5"],
+    ["nothing when the product never came in", null, null, null, "0"],
+  ])("is the cost of %s", (_label, lastLotTaken, newestLot, lastEntry, expected) => {
+    expect(
+      costOfShortfall({
+        lastLotTaken: cost(lastLotTaken),
+        newestLot: cost(newestLot),
+        lastEntry: cost(lastEntry),
+      }).toString(),
+    ).toBe(expected);
   });
 });

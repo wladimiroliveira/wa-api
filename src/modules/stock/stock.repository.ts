@@ -1,7 +1,7 @@
 import { Prisma } from "../../generated/prisma/index.js";
 import { pageArgs } from "../../lib/pagination.js";
 import { prisma } from "../../lib/prisma.js";
-import { allocate, inOrderOfUse } from "./stock.allocation.js";
+import { allocate, costOfShortfall, inOrderOfUse, owedOf } from "./stock.allocation.js";
 import { expiryOf, LotStatus } from "./stock.position.js";
 
 const ZERO = new Prisma.Decimal(0);
@@ -33,8 +33,7 @@ export function increaseStock(
 }
 
 // Reads the balance of a product and holds it until the transaction ends, so whatever is decided
-// from it is still true when it is written. `owed` is what was taken beyond what the lots held and
-// is still to be settled: the lots that are left hold that much more than the balance shows.
+// from it is still true when it is written.
 export async function lockStockBalance(client: Prisma.TransactionClient, productSku: string) {
   // A product that never moved has no row to hold, and two first movements at once would each read
   // the other's lot against a balance that is not there yet. Opening the row first gives them one.
@@ -54,7 +53,7 @@ export async function lockStockBalance(client: Prisma.TransactionClient, product
   const held = _sum.quantity ?? ZERO;
   const quantity = balance?.quantity ?? ZERO;
 
-  return { held, lastEntryCost: balance?.lastEntryCost ?? null, owed: Prisma.Decimal.max(ZERO, held.sub(quantity)) };
+  return { held, lastEntryCost: balance?.lastEntryCost ?? null, owed: owedOf({ held, quantity }) };
 }
 
 // Writes off what is owed: the balance becomes what the lots hold.
@@ -126,7 +125,7 @@ export async function suggestLots(input: { productSku: string; quantity: Prisma.
 type Take = { lotId: string | null; quantity: Prisma.Decimal; unitCost: Prisma.Decimal };
 
 // Takes a quantity out of the stock, lot by lot. What the lots do not cover is taken anyway and
-// stays owed, costing what the last lot taken from cost.
+// stays owed.
 export async function takeFromLots(
   client: Prisma.TransactionClient,
   input: { productSku: string; quantity: Prisma.Decimal; today: string },
@@ -150,8 +149,11 @@ export async function takeFromLots(
   }));
 
   if (shortfall.gt(0)) {
-    const unitCost =
-      taken.at(-1)?.unitCost ?? (await newestLotCost(client, productSku)) ?? balance.lastEntryCost ?? ZERO;
+    const unitCost = costOfShortfall({
+      lastLotTaken: taken.at(-1)?.unitCost ?? null,
+      newestLot: await newestLotCost(client, productSku),
+      lastEntry: balance.lastEntryCost,
+    });
 
     taken.push({ lotId: null, quantity: shortfall, unitCost });
   }
