@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { Permission } from "../../generated/prisma/index.js";
-import { toDateString } from "../../lib/dates.js";
+import { toOptionalDateString } from "../../lib/dates.js";
 import { messageSchema } from "../auth/auth.schemas.js";
 import { findSupplierById } from "../suppliers/suppliers.repository.js";
 import { findProductBySku, insertEntry, NegativeBalancePendingError } from "./entries.repository.js";
@@ -61,7 +61,7 @@ export default async function entriesRoutes(app: FastifyInstance) {
         product: { sku: product.sku, description: product.description, unit: product.unit },
         lot: {
           id: lot.id,
-          expiresAt: lot.expiresAt === null ? null : toDateString(lot.expiresAt),
+          expiresAt: toOptionalDateString(lot.expiresAt),
           supplier: lot.supplier,
           quantity: lot.quantity.toString(),
         },

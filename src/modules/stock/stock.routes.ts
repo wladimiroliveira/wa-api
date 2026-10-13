@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { MeasurementUnit, Permission, Prisma } from "../../generated/prisma/index.js";
 import { toPage } from "../../lib/pagination.js";
-import { localToday, toDateString } from "../../lib/dates.js";
+import { localToday, toOptionalDateString } from "../../lib/dates.js";
 import { messageSchema } from "../auth/auth.schemas.js";
 import { lotCountOf, lotStatusOf, lotValueOf, nextExpiryOf, statusOf, valueOf } from "./stock.position.js";
 import { findProductWithStock, listProductsWithStock, listStockMovements } from "./stock.repository.js";
@@ -64,7 +64,7 @@ export default async function stockRoutes(app: FastifyInstance) {
       return reply.send({
         items: items.map(({ lot, ...movement }) => ({
           ...movement,
-          lot: lot === null ? null : { ...lot, expiresAt: lot.expiresAt === null ? null : toDateString(lot.expiresAt) },
+          lot: lot === null ? null : { ...lot, expiresAt: toOptionalDateString(lot.expiresAt) },
           quantity: movement.quantity.toString(),
           unitCost: movement.unitCost.toString(),
           createdAt: movement.createdAt.toISOString(),
@@ -124,7 +124,7 @@ export default async function stockRoutes(app: FastifyInstance) {
         ...toPosition(product, stock, lots, today),
         lots: lots.map((lot) => ({
           id: lot.id,
-          expiresAt: lot.expiresAt === null ? null : toDateString(lot.expiresAt),
+          expiresAt: toOptionalDateString(lot.expiresAt),
           supplier: lot.supplier,
           initialQuantity: lot.initialQuantity.toString(),
           quantity: lot.quantity.toString(),

@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { Permission } from "../../generated/prisma/index.js";
-import { toDateString } from "../../lib/dates.js";
+import { toOptionalDateString } from "../../lib/dates.js";
 import { AUTHENTICATED } from "../auth/auth.access.js";
 import { messageSchema } from "../auth/auth.schemas.js";
 import {
@@ -138,7 +138,7 @@ export default async function lossesRoutes(app: FastifyInstance) {
         product: loss.lot.product,
         lot: {
           id: lot.id,
-          expiresAt: lot.expiresAt === null ? null : toDateString(lot.expiresAt),
+          expiresAt: toOptionalDateString(lot.expiresAt),
           quantity: lot.left.toString(),
         },
       });
