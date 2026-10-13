@@ -18,7 +18,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await app.register(fastifyCors, {
     origin: env.CORS_ORIGINS,
-    methods: ["GET", "POST", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   });
 
