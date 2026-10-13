@@ -4,8 +4,8 @@ import { addDays, toDateString } from "../../lib/dates.js";
 // In order of urgency: a product is read as the first of these that applies to it.
 export const StockStatus = {
   NEGATIVE: "NEGATIVE",
-  EMPTY: "EMPTY",
   EXPIRED: "EXPIRED",
+  EMPTY: "EMPTY",
   EXPIRING_SOON: "EXPIRING_SOON",
   BELOW_MINIMUM: "BELOW_MINIMUM",
   OK: "OK",
@@ -47,11 +47,13 @@ export function lotStatusOf(lot: Lot, today: string) {
 
 export function statusOf({ quantity, minimumQuantity }: StockBalance, lots: Lot[], today: string) {
   if (quantity.lt(0)) return StockStatus.NEGATIVE;
-  if (quantity.eq(0)) return StockStatus.EMPTY;
 
   const expiries = held(lots).map((lot) => expiryOf(lot.expiresAt, today));
 
+  // An expired lot is skipped by whatever takes from the stock, so a balance can reach zero with
+  // one still on the shelf, waiting to be written off.
   if (expiries.includes(LotStatus.EXPIRED)) return StockStatus.EXPIRED;
+  if (quantity.eq(0)) return StockStatus.EMPTY;
   if (expiries.includes(LotStatus.EXPIRING_SOON)) return StockStatus.EXPIRING_SOON;
   if (minimumQuantity !== null && quantity.lt(minimumQuantity)) return StockStatus.BELOW_MINIMUM;
 

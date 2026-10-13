@@ -43,6 +43,7 @@ describe("lotStatusOf", () => {
 describe("statusOf", () => {
   it.each([
     ["a negative balance first", balance("-1", "5"), [lot("1", "2026-10-01")], "NEGATIVE"],
+    ["an expired lot still held before an empty balance", balance("0", "5"), [lot("5", "2026-10-01")], "EXPIRED"],
     ["an empty balance next", balance("0", "5"), [], "EMPTY"],
     [
       "an expired lot before one about to expire",

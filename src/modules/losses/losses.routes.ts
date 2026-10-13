@@ -22,9 +22,11 @@ import {
   updateLossReasonBodySchema,
 } from "./losses.schemas.js";
 
-const LOT_FAILURES = {
+const LOSS_FAILURES = {
   missing: { code: 404, message: "Lot not found." },
   insufficient: { code: 409, message: "The lot does not hold that much." },
+  "reason-missing": { code: 404, message: "Loss reason not found." },
+  "reason-inactive": { code: 409, message: "Loss reason is inactive." },
 } as const;
 
 export default async function lossesRoutes(app: FastifyInstance) {
@@ -108,20 +110,10 @@ export default async function lossesRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const reason = await findLossReasonById(request.body.reasonId);
-
-      if (reason === null) {
-        return reply.code(404).send({ message: "Loss reason not found." });
-      }
-
-      if (!reason.isActive) {
-        return reply.code(409).send({ message: "Loss reason is inactive." });
-      }
-
       const recorded = await insertLoss({ ...request.body, createdById: request.currentUser!.id });
 
       if ("failure" in recorded) {
-        const { code, message } = LOT_FAILURES[recorded.failure];
+        const { code, message } = LOSS_FAILURES[recorded.failure];
 
         return reply.code(code).send({ message });
       }

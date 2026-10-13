@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Permission, StockMovementType } from "../../../src/generated/prisma/index.js";
+import { Permission, Prisma, StockMovementType } from "../../../src/generated/prisma/index.js";
+import { takeFromLots } from "../../../src/modules/stock/stock.repository.js";
 import { authenticateAs, startTestApp } from "../../support/app.js";
 import { resetDatabase, testPrisma } from "../../support/database.js";
 
@@ -460,5 +461,27 @@ describe("GET /v1/stock/:sku", () => {
 
   it("answers 401 without a token", async () => {
     expect((await getProductStock(undefined, "0199a1f0-0000-7000-8000-0000000000ff")).statusCode).toBe(401);
+  });
+});
+
+describe("a product whose only lot expired and whose balance was consumed anyway", () => {
+  it("still reads as holding an expired lot", async () => {
+    const { headers } = await authenticateAs(app, [Permission.REPORTS_READ]);
+    const flour = await createProduct("Flour");
+    await createStock(flour.sku, { quantity: "5", averageCost: "4" }, daysFromToday(-1));
+
+    // A production takes 5: the expired lot is skipped, so all of it stays owed.
+    await testPrisma.$transaction((tx) =>
+      takeFromLots(tx, { productSku: flour.sku, quantity: new Prisma.Decimal(5), today: daysFromToday(0) }),
+    );
+
+    const [item] = (await getStock(headers)).json().items;
+
+    expect({ quantity: item.quantity, lotCount: item.lotCount, nextExpiresAt: item.nextExpiresAt }).toEqual({
+      quantity: "0",
+      lotCount: 1,
+      nextExpiresAt: daysFromToday(-1),
+    });
+    expect(item.status).toBe("EXPIRED");
   });
 });
