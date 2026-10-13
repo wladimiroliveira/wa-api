@@ -121,7 +121,14 @@ async function stockInLots(productSku: string, lots: [quantity: string, unitCost
     data: { productSku, quantity: String(total), averageCost: "1", lastEntryCost: "1" },
   });
 
-  return Promise.all(lots.map(([quantity, unitCost, expiresAt]) => lot(productSku, quantity, unitCost, expiresAt)));
+  // One at a time: created together, which of them came in first would be left to chance.
+  const created = [];
+
+  for (const [quantity, unitCost, expiresAt] of lots) {
+    created.push(await lot(productSku, quantity, unitCost, expiresAt));
+  }
+
+  return created;
 }
 
 const lotQuantity = async (id: string) =>
