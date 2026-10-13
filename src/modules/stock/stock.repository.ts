@@ -1,7 +1,8 @@
 import { Prisma } from "../../generated/prisma/index.js";
 import { pageArgs } from "../../lib/pagination.js";
 import { prisma } from "../../lib/prisma.js";
-import { allocate } from "./stock.allocation.js";
+import { allocate, inOrderOfUse } from "./stock.allocation.js";
+import { expiryOf, LotStatus } from "./stock.position.js";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -89,25 +90,29 @@ export function openLot(
   });
 }
 
-type UsableLot = { id: string; quantity: Prisma.Decimal; unitCost: Prisma.Decimal; expiresAt: Date | null };
+type UsableLot = {
+  id: string;
+  quantity: Prisma.Decimal;
+  unitCost: Prisma.Decimal;
+  expiresAt: Date | null;
+  createdAt: Date;
+};
 
-// The lots a quantity may be taken from, in the order they are to be used: the first to expire
-// first, the ones that never expire last, and the one that came in earlier ahead of another
-// expiring on the same day. An expired lot is not among them: it leaves the stock as a loss, not
-// as an input.
-function usableLots(
+// The lots a quantity may be taken from, in the order they are to be used. An expired lot is not
+// among them: it leaves the stock as a loss, not as an input.
+async function usableLots(
   client: Prisma.TransactionClient,
   { productSku, today, lock }: { productSku: string; today: string; lock: boolean },
 ) {
-  return client.$queryRaw<UsableLot[]>`
-    SELECT id, quantity, unit_cost AS "unitCost", expires_at AS "expiresAt"
+  const held = await client.$queryRaw<UsableLot[]>`
+    SELECT id, quantity, unit_cost AS "unitCost", expires_at AS "expiresAt", created_at AS "createdAt"
     FROM stock_lots
     WHERE product_sku = ${productSku}::uuid
       AND quantity > 0
-      AND (expires_at IS NULL OR (expires_at AT TIME ZONE 'UTC')::date >= ${today}::date)
-    ORDER BY expires_at ASC NULLS LAST, created_at ASC, id ASC
     ${lock ? Prisma.sql`FOR UPDATE` : Prisma.empty}
   `;
+
+  return inOrderOfUse(held.filter((lot) => expiryOf(lot.expiresAt, today) !== LotStatus.EXPIRED));
 }
 
 // Which lots a quantity would come from if it were taken now, and what they would not cover. It
@@ -257,10 +262,9 @@ export function listProductsWithStock() {
   });
 }
 
-// The lots come in the order they are to be used: the first to expire first, the ones that never
-// expire last, and the one that came in earlier ahead of another expiring on the same day.
-export function findProductWithStock(sku: string, { depleted }: { depleted: boolean }) {
-  return prisma.product.findUnique({
+// The lots come in the order they are to be used.
+export async function findProductWithStock(sku: string, { depleted }: { depleted: boolean }) {
+  const product = await prisma.product.findUnique({
     where: { sku },
     select: {
       sku: true,
@@ -278,8 +282,9 @@ export function findProductWithStock(sku: string, { depleted }: { depleted: bool
           createdAt: true,
           supplier: { select: { id: true, name: true } },
         },
-        orderBy: [{ expiresAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }, { id: "asc" }],
       },
     },
   });
+
+  return product === null ? null : { ...product, lots: inOrderOfUse(product.lots) };
 }
