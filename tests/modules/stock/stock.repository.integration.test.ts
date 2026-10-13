@@ -68,3 +68,26 @@ describe("taking from the lots of one product at the same time", () => {
     ).toBe("5");
   });
 });
+
+describe("taking more than the lots of a product cover", () => {
+  it("costs what is owed at the last entry cost when the product never had a lot", async () => {
+    const product = await testPrisma.product.create({
+      data: { description: "Wheat flour", kind: "GOODS", unit: "KILOGRAM" },
+    });
+    // A balance that went negative before there were lots: nothing was left to turn into one.
+    await testPrisma.productStock.create({
+      data: { productSku: product.sku, quantity: "-2", averageCost: "4", lastEntryCost: "4.5" },
+    });
+
+    const taken = await testPrisma.$transaction((tx) =>
+      takeFromLots(tx, { productSku: product.sku, quantity: new Prisma.Decimal(3), today: "2026-01-01" }),
+    );
+
+    expect(
+      taken.map((take) => ({ ...take, quantity: take.quantity.toString(), unitCost: take.unitCost.toString() })),
+    ).toEqual([{ lotId: null, quantity: "3", unitCost: "4.5" }]);
+    expect(
+      (await testPrisma.productStock.findUniqueOrThrow({ where: { productSku: product.sku } })).quantity.toString(),
+    ).toBe("-5");
+  });
+});
