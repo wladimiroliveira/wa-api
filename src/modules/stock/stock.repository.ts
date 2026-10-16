@@ -32,6 +32,19 @@ export function increaseStock(
   `;
 }
 
+// The minimum is a setting of the product, kept beside its balance: setting it on a product that
+// never moved opens the balance at zero, the same row its first movement would open.
+export function setMinimumQuantity(
+  client: Prisma.TransactionClient,
+  input: { productSku: string; minimumQuantity: string | null },
+) {
+  return client.$executeRaw`
+    INSERT INTO product_stocks AS stock (product_sku, quantity, minimum_quantity, updated_at)
+    VALUES (${input.productSku}::uuid, 0, ${input.minimumQuantity}::numeric, now())
+    ON CONFLICT (product_sku) DO UPDATE SET minimum_quantity = EXCLUDED.minimum_quantity, updated_at = now()
+  `;
+}
+
 type HeldBalance = { quantity: Prisma.Decimal; lastEntryCost: Prisma.Decimal | null };
 
 // Holds the balances of several products until the transaction ends, always in the same order.

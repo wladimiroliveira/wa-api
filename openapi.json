@@ -1454,6 +1454,10 @@
                       },
                       "isActive": {
                         "type": "boolean"
+                      },
+                      "minimumQuantity": {
+                        "nullable": true,
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -1462,7 +1466,8 @@
                       "unit",
                       "gtin",
                       "kind",
-                      "isActive"
+                      "isActive",
+                      "minimumQuantity"
                     ],
                     "additionalProperties": false
                   }
@@ -1509,6 +1514,10 @@
                   "gtin": {
                     "type": "string",
                     "pattern": "^\\d{8,14}$"
+                  },
+                  "minimumQuantity": {
+                    "type": "string",
+                    "pattern": "^\\d{1,12}(\\.\\d{1,6})?$"
                   }
                 },
                 "required": [
@@ -1559,6 +1568,10 @@
                     },
                     "isActive": {
                       "type": "boolean"
+                    },
+                    "minimumQuantity": {
+                      "nullable": true,
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -1567,7 +1580,156 @@
                     "unit",
                     "gtin",
                     "kind",
-                    "isActive"
+                    "isActive",
+                    "minimumQuantity"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/products/{sku}": {
+      "patch": {
+        "summary": "Edita a descrição, o GTIN e o estoque mínimo de um produto, ou o inativa e reativa",
+        "tags": [
+          "products"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "gtin": {
+                    "nullable": true,
+                    "type": "string",
+                    "pattern": "^\\d{8,14}$"
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "minimumQuantity": {
+                    "nullable": true,
+                    "type": "string",
+                    "pattern": "^\\d{1,12}(\\.\\d{1,6})?$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "sku",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sku": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "unit": {
+                      "type": "string",
+                      "enum": [
+                        "UNIT",
+                        "KILOGRAM",
+                        "GRAM",
+                        "LITER",
+                        "MILLILITER"
+                      ]
+                    },
+                    "gtin": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "GOODS",
+                        "MANUFACTURED"
+                      ]
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "minimumQuantity": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "sku",
+                    "description",
+                    "unit",
+                    "gtin",
+                    "kind",
+                    "isActive",
+                    "minimumQuantity"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
                   ],
                   "additionalProperties": false
                 }
