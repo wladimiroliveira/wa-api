@@ -37,6 +37,7 @@ HEAD /v1/suppliers -> CATALOG_READ
 HEAD /v1/users -> ACCESS_READ
 HEAD /v1/users/:id -> ACCESS_READ
 PATCH /v1/loss-reasons/:id -> LOSSES_UPDATE
+PATCH /v1/products/:sku -> CATALOG_UPDATE
 PATCH /v1/roles/:id -> ACCESS_UPDATE
 PATCH /v1/sessions/me/password -> authenticated
 PATCH /v1/users/:id -> ACCESS_UPDATE
