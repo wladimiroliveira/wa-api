@@ -75,6 +75,70 @@ describe("GET /v1/products", () => {
   });
 });
 
+describe("GET /v1/products with filters", () => {
+  let headers: { authorization: string };
+
+  const searchProducts = (query: string) => app.inject({ method: "GET", url: `/v1/products?${query}`, headers });
+
+  const descriptionsOf = async (query: string) =>
+    (await searchProducts(query)).json().map(({ description }: { description: string }) => description);
+
+  beforeEach(async () => {
+    ({ headers } = await authenticateAs(app, [Permission.CATALOG_READ]));
+    await testPrisma.product.createMany({
+      data: [
+        { description: "Pão francês", kind: "MANUFACTURED", unit: "UNIT" },
+        { description: "Farinha de trigo", kind: "GOODS", unit: "KILOGRAM", gtin: "7891000100103" },
+        { description: "Fermento biológico", kind: "GOODS", unit: "GRAM", gtin: "7896000200204" },
+        { description: "Leite integral", kind: "GOODS", unit: "LITER", isActive: false },
+      ],
+    });
+  });
+
+  it("finds by part of the description, whatever the case and the accents", async () => {
+    expect(await descriptionsOf("q=PAO")).toEqual(["Pão francês"]);
+    expect(await descriptionsOf("q=frances")).toEqual(["Pão francês"]);
+    expect(await descriptionsOf("q=biol%C3%B3g")).toEqual(["Fermento biológico"]);
+  });
+
+  it("finds by part of the GTIN", async () => {
+    expect(await descriptionsOf("q=0001001")).toEqual(["Farinha de trigo"]);
+  });
+
+  it("reads the search as plain text, not as a pattern", async () => {
+    expect(await descriptionsOf("q=%25")).toEqual([]);
+    expect(await descriptionsOf("q=_")).toEqual([]);
+  });
+
+  it("ignores a blank search", async () => {
+    expect(await descriptionsOf("q=%20%20")).toHaveLength(4);
+  });
+
+  it("filters by kind", async () => {
+    expect(await descriptionsOf("kind=MANUFACTURED")).toEqual(["Pão francês"]);
+  });
+
+  it("filters by any of several units", async () => {
+    expect(await descriptionsOf("unit=KILOGRAM&unit=GRAM")).toEqual(["Farinha de trigo", "Fermento biológico"]);
+  });
+
+  it("filters the active or the inactive products", async () => {
+    expect(await descriptionsOf("status=INACTIVE")).toEqual(["Leite integral"]);
+    expect(await descriptionsOf("status=ACTIVE")).toEqual(["Farinha de trigo", "Fermento biológico", "Pão francês"]);
+  });
+
+  it("answers only what every filter accepts", async () => {
+    expect(await descriptionsOf("q=fer&kind=GOODS&unit=GRAM&status=ACTIVE")).toEqual(["Fermento biológico"]);
+    expect(await descriptionsOf("q=leite&status=ACTIVE")).toEqual([]);
+  });
+
+  it("answers 400 for a kind, unit or status it does not know", async () => {
+    expect((await searchProducts("kind=SERVICE")).statusCode).toBe(400);
+    expect((await searchProducts("unit=TON")).statusCode).toBe(400);
+    expect((await searchProducts("status=DELETED")).statusCode).toBe(400);
+  });
+});
+
 const postProduct = (headers: { authorization: string } | undefined, payload: Record<string, unknown>) =>
   app.inject({ method: "POST", url: "/v1/products", headers, payload });
 

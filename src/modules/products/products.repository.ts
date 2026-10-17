@@ -1,6 +1,7 @@
 import { MeasurementUnit, Prisma, ProductKind } from "../../generated/prisma/index.js";
 import { prisma } from "../../lib/prisma.js";
 import { setMinimumQuantity } from "../stock/stock.repository.js";
+import type { ProductFilters } from "./products.schemas.js";
 
 const PRODUCT_FIELDS = {
   select: {
@@ -22,8 +23,30 @@ function toProduct({ stock, ...product }: ProductRow) {
 
 const toOptionalProduct = (row: ProductRow | null) => (row === null ? null : toProduct(row));
 
-export async function listProducts() {
-  return (await prisma.product.findMany({ ...PRODUCT_FIELDS, orderBy: { description: "asc" } })).map(toProduct);
+// The search is read as plain text: the wildcards of LIKE match only themselves.
+const containing = (search: string) => `%${search.replace(/[\\%_]/g, "\\$&")}%`;
+
+// Prisma has no accent-insensitive comparison, so the search alone goes through SQL.
+async function skusMatching(search: string) {
+  const pattern = containing(search);
+  const rows = await prisma.$queryRaw<{ sku: string }[]>`
+    SELECT sku FROM products
+    WHERE public.unaccent(description) ILIKE public.unaccent(${pattern}) OR gtin LIKE ${pattern}
+  `;
+
+  return rows.map(({ sku }) => sku);
+}
+
+export async function listProducts({ q, kind, unit, status }: ProductFilters = {}) {
+  const skus = q ? await skusMatching(q) : undefined;
+  const where = {
+    sku: skus && { in: skus },
+    kind: kind && { in: kind },
+    unit: unit && { in: unit },
+    isActive: status && status === "ACTIVE",
+  };
+
+  return (await prisma.product.findMany({ ...PRODUCT_FIELDS, where, orderBy: { description: "asc" } })).map(toProduct);
 }
 
 export async function findProductBySku(sku: string) {
