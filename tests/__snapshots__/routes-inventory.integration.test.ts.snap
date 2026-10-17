@@ -2,6 +2,7 @@
 
 exports[`routes inventory > matches the recorded access of every route 1`] = `
 "DELETE /v1/roles/:id -> ACCESS_UPDATE
+DELETE /v1/sessions/me/table-layouts/:tableKey -> authenticated
 GET /v1/health -> public
 GET /v1/loss-reasons -> authenticated
 GET /v1/pre-weighings -> PRODUCTION_READ
@@ -13,6 +14,7 @@ GET /v1/products -> CATALOG_READ
 GET /v1/products/:sku/recipe -> CATALOG_READ
 GET /v1/roles -> ACCESS_READ
 GET /v1/sessions/me -> authenticated
+GET /v1/sessions/me/table-layouts -> authenticated
 GET /v1/stock -> REPORTS_READ
 GET /v1/stock-movements -> ENTRIES_READ
 GET /v1/stock/:sku -> REPORTS_READ
@@ -30,6 +32,7 @@ HEAD /v1/products -> CATALOG_READ
 HEAD /v1/products/:sku/recipe -> CATALOG_READ
 HEAD /v1/roles -> ACCESS_READ
 HEAD /v1/sessions/me -> authenticated
+HEAD /v1/sessions/me/table-layouts -> authenticated
 HEAD /v1/stock -> REPORTS_READ
 HEAD /v1/stock-movements -> ENTRIES_READ
 HEAD /v1/stock/:sku -> REPORTS_READ
@@ -56,5 +59,6 @@ POST /v1/sessions/signin -> public
 POST /v1/sessions/signout -> authenticated
 POST /v1/suppliers -> CATALOG_CREATE
 POST /v1/users -> ACCESS_CREATE
-PUT /v1/products/:sku/recipe -> CATALOG_UPDATE"
+PUT /v1/products/:sku/recipe -> CATALOG_UPDATE
+PUT /v1/sessions/me/table-layouts/:tableKey -> authenticated"
 `;
