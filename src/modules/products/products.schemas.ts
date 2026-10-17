@@ -40,5 +40,20 @@ export const updateProductBodySchema = z
 
 export const productParamsSchema = z.object({ sku: z.uuid() });
 
+// A parameter repeated in the query string arrives as an array, one written once as a string.
+const oneOrMore = <Item extends z.ZodType>(item: Item) =>
+  z.union([item, z.array(item)]).transform((value) => [value].flat() as z.output<Item>[]);
+
+// No filter answers the whole catalog, inactive products included.
+export const listProductsQuerySchema = z.object({
+  // Part of the description or of the GTIN. A blank one searches nothing.
+  q: z.string().trim().max(120).optional(),
+  kind: oneOrMore(z.enum(ProductKind)).optional(),
+  unit: oneOrMore(z.enum(MeasurementUnit)).optional(),
+  status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+});
+
+export type ProductFilters = z.output<typeof listProductsQuerySchema>;
+
 export const listsEachProductOnce = (items: { productSku: string }[]) =>
   new Set(items.map(({ productSku }) => productSku.toLowerCase())).size === items.length;

@@ -13,6 +13,7 @@ import {
 } from "./products.repository.js";
 import {
   createProductBodySchema,
+  listProductsQuerySchema,
   productParamsSchema,
   productSchema,
   updateProductBodySchema,
@@ -44,9 +45,14 @@ export default async function productsRoutes(app: FastifyInstance) {
     "/products",
     {
       config: { auth: Permission.CATALOG_READ },
-      schema: { tags: ["products"], summary: "Lista os produtos", response: { 200: z.array(productSchema) } },
+      schema: {
+        tags: ["products"],
+        summary: "Lista os produtos, filtrados por busca, tipo, unidade e situação",
+        querystring: listProductsQuerySchema,
+        response: { 200: z.array(productSchema) },
+      },
     },
-    async (_request, reply) => reply.send(await listProducts()),
+    async (request, reply) => reply.send(await listProducts(request.query)),
   );
 
   typed.post(

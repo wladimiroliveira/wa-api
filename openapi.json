@@ -1409,9 +1409,90 @@
     },
     "/v1/products": {
       "get": {
-        "summary": "Lista os produtos",
+        "summary": "Lista os produtos, filtrados por busca, tipo, unidade e situação",
         "tags": [
           "products"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            },
+            "in": "query",
+            "name": "q",
+            "required": false
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "GOODS",
+                    "MANUFACTURED"
+                  ]
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "GOODS",
+                      "MANUFACTURED"
+                    ]
+                  }
+                }
+              ]
+            },
+            "in": "query",
+            "name": "kind",
+            "required": false
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "UNIT",
+                    "KILOGRAM",
+                    "GRAM",
+                    "LITER",
+                    "MILLILITER"
+                  ]
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "UNIT",
+                      "KILOGRAM",
+                      "GRAM",
+                      "LITER",
+                      "MILLILITER"
+                    ]
+                  }
+                }
+              ]
+            },
+            "in": "query",
+            "name": "unit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "INACTIVE"
+              ]
+            },
+            "in": "query",
+            "name": "status",
+            "required": false
+          }
         ],
         "responses": {
           "200": {
