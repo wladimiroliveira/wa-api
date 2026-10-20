@@ -13,6 +13,7 @@ import recipesRoutes from "./modules/recipes/recipes.routes.js";
 import rolesRoutes from "./modules/roles/roles.routes.js";
 import stockRoutes from "./modules/stock/stock.routes.js";
 import suppliersRoutes from "./modules/suppliers/suppliers.routes.js";
+import tableLayoutsRoutes from "./modules/table-layouts/table-layouts.routes.js";
 import usersRoutes from "./modules/users/users.routes.js";
 
 export default async function (app: FastifyInstance) {
@@ -40,4 +41,5 @@ export default async function (app: FastifyInstance) {
   await app.register(recipesRoutes);
   await app.register(preWeighingsRoutes);
   await app.register(productionsRoutes);
+  await app.register(tableLayoutsRoutes);
 }

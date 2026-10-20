@@ -53,6 +53,7 @@ model User {
   stockLosses      StockLoss[]
   preWeighings     PreWeighing[]
   productions      Production[]
+  tableLayouts     TableLayout[]
   createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -71,6 +72,22 @@ model RefreshToken {
 
   @@index([userId], map: "idx_refresh_tokens_user_id")
   @@map("refresh_tokens")
+}
+
+// How a user arranged the columns of a table: their order and the widths dragged by hand. It is
+// kept on the server so the arrangement follows the user to any device.
+model TableLayout {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tableKey  String   @map("table_key")
+  order     String[]
+  widths    Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([userId, tableKey], map: "uq_table_layouts_user_id_table_key")
+  @@map("table_layouts")
 }
 
 enum ProductKind {
