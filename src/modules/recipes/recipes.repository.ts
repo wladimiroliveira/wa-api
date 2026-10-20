@@ -15,6 +15,19 @@ const recipeSelect = {
 
 export type RecipeRecord = Prisma.RecipeGetPayload<{ select: typeof recipeSelect }>;
 
+const recipeSummarySelect = {
+  yieldQuantity: true,
+  updatedAt: true,
+  product: { select: productSelect },
+  _count: { select: { ingredients: true } },
+} satisfies Prisma.RecipeSelect;
+
+export type RecipeSummaryRecord = Prisma.RecipeGetPayload<{ select: typeof recipeSummarySelect }>;
+
+export function findRecipeSummaries() {
+  return prisma.recipe.findMany({ select: recipeSummarySelect, orderBy: { product: { description: "asc" } } });
+}
+
 export function findProductsBySku(skus: string[]) {
   return prisma.product.findMany({
     where: { sku: { in: skus } },

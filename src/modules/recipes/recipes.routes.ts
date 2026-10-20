@@ -1,9 +1,17 @@
 import { FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
+import { z } from "zod";
 import { Permission, ProductKind } from "../../generated/prisma/index.js";
 import { messageSchema } from "../auth/auth.schemas.js";
-import { findProductsBySku, findRecipeByProductSku, RecipeRecord, saveRecipe } from "./recipes.repository.js";
-import { recipeParamsSchema, recipeSchema, saveRecipeBodySchema } from "./recipes.schemas.js";
+import {
+  findProductsBySku,
+  findRecipeByProductSku,
+  findRecipeSummaries,
+  RecipeRecord,
+  RecipeSummaryRecord,
+  saveRecipe,
+} from "./recipes.repository.js";
+import { recipeParamsSchema, recipeSchema, recipeSummarySchema, saveRecipeBodySchema } from "./recipes.schemas.js";
 
 const toResponse = (recipe: RecipeRecord) => ({
   product: recipe.product,
@@ -12,8 +20,28 @@ const toResponse = (recipe: RecipeRecord) => ({
   updatedAt: recipe.updatedAt.toISOString(),
 });
 
+const toSummary = (recipe: RecipeSummaryRecord) => ({
+  product: recipe.product,
+  yieldQuantity: recipe.yieldQuantity.toString(),
+  ingredientCount: recipe._count.ingredients,
+  updatedAt: recipe.updatedAt.toISOString(),
+});
+
 export default async function recipesRoutes(app: FastifyInstance) {
   const typed = app.withTypeProvider<ZodTypeProvider>();
+
+  typed.get(
+    "/recipes",
+    {
+      config: { auth: Permission.CATALOG_READ },
+      schema: {
+        tags: ["recipes"],
+        summary: "Lista um resumo de cada receita",
+        response: { 200: z.array(recipeSummarySchema) },
+      },
+    },
+    async (_request, reply) => reply.send((await findRecipeSummaries()).map(toSummary)),
+  );
 
   typed.get(
     "/products/:sku/recipe",
