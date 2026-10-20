@@ -297,6 +297,67 @@ describe("GET /v1/products/:sku/recipe", () => {
   });
 });
 
+describe("GET /v1/recipes", () => {
+  const listRecipes = (headers: Headers) => app.inject({ method: "GET", url: "/v1/recipes", headers });
+
+  it("lists a summary of every recipe, by the description of its product", async () => {
+    const { headers } = await authenticateAs(app, [Permission.CATALOG_READ, Permission.CATALOG_UPDATE]);
+    const dough = await createManufactured("Bread dough");
+    const bread = await createManufactured("Bread", { unit: "UNIT" });
+    await createManufactured("Cake batter");
+    const flour = await createProduct("Wheat flour");
+    const water = await createProduct("Water", { unit: "LITER" });
+    const savedDough = await putRecipe(headers, dough.sku, {
+      yieldQuantity: "25",
+      ingredients: [
+        { productSku: flour.sku, quantity: "15.5" },
+        { productSku: water.sku, quantity: "9" },
+      ],
+    });
+    const savedBread = await putRecipe(headers, bread.sku, {
+      yieldQuantity: "100",
+      ingredients: [{ productSku: dough.sku, quantity: "25" }],
+    });
+
+    const response = await listRecipes(headers);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual([
+      {
+        product: { sku: bread.sku, description: "Bread", unit: "UNIT" },
+        yieldQuantity: "100",
+        ingredientCount: 1,
+        updatedAt: savedBread.json().updatedAt,
+      },
+      {
+        product: { sku: dough.sku, description: "Bread dough", unit: "KILOGRAM" },
+        yieldQuantity: "25",
+        ingredientCount: 2,
+        updatedAt: savedDough.json().updatedAt,
+      },
+    ]);
+  });
+
+  it("answers an empty list when no recipe exists", async () => {
+    const { headers } = await authenticateAs(app, [Permission.CATALOG_READ]);
+
+    const response = await listRecipes(headers);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual([]);
+  });
+
+  it("answers 403 without CATALOG_READ", async () => {
+    const { headers } = await authenticateAs(app, [Permission.CATALOG_UPDATE]);
+
+    expect((await listRecipes(headers)).statusCode).toBe(403);
+  });
+
+  it("answers 401 without a token", async () => {
+    expect((await listRecipes(undefined)).statusCode).toBe(401);
+  });
+});
+
 async function getRecipeIngredientSkus(productSku: string): Promise<string[]> {
   const ingredients = await testPrisma.recipeIngredient.findMany({ where: { recipe: { productSku } } });
 

@@ -20,3 +20,11 @@ export const recipeSchema = z.object({
   ingredients: z.array(z.object({ product: productSummarySchema, quantity: z.string() })),
   updatedAt: z.iso.datetime(),
 });
+
+// What a list of recipes shows of each one: enough to tell them apart, not the ingredients themselves.
+export const recipeSummarySchema = z.object({
+  product: productSummarySchema,
+  yieldQuantity: z.string(),
+  ingredientCount: z.number().int(),
+  updatedAt: z.iso.datetime(),
+});
